@@ -14,9 +14,4 @@ It also supports **exporting** the audio + visualization to a `.webm` file (requ
 - **Playback Controls**: Simple **Play**, **Pause**, **Stop** buttons, plus a time slider.  
 - **Export**: Record the visual + audio into a `.webm` video, with a **progress bar** and **cancel** option.
 
----
 
-## License
-
-MIT License (or whichever license you prefer).  
-Feel free to modify and adapt this code for your own projects!
