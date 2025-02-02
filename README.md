@@ -1,21 +1,22 @@
-# Green Audio Visualizer
+# My Audio Visualizer
 
-A minimal **Next.js 13** application that lets you:
+A **Next.js** app that visualizes audio in real-time as a **radial ripple** from the canvas center outward.  
+It also supports **exporting** the audio + visualization to a `.webm` file (requires running on **HTTPS** or using special browser flags).
 
-1. **Select an audio file** (MP3, WAV, etc.)  
-2. **Play** it via a native `<audio>` element with controls (seek, pause, etc.).  
-3. **Visualize** the waveform in a **“center-out”** green pixel pattern.  
-4. **Record** a `.webm` video combining the **canvas animation** and **audio** output, then **download** it.
+![Audio Visualizer Demo](public/Screen_Recording.gif)
+
+---
 
 ## Features
 
-- **Audio File Input**  
-  You pick a file from disk using `<input type="file">`.  
-- **Green-Only Visualization**  
-  A hue of 120 (green) that shifts brightness based on amplitude.  
-- **Center-Out**  
-  The grid is sorted by distance from center, so the **center** squares light up first.  
-- **MediaRecorder**  
-  Uses the [`canvas.captureStream()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/captureStream) and [`audioElement.captureStream()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/captureStream) to record audio + visual into a single `.webm`.  
-- **TypeScript**  
-  Includes type definitions for `captureStream`, so TypeScript won’t complain.
+- **Drag & Drop** an audio file (or click to select one).  
+- **Radial Visualization**: The amplitude determines how far from the center the ripple expands.  
+- **Playback Controls**: Simple **Play**, **Pause**, **Stop** buttons, plus a time slider.  
+- **Export**: Record the visual + audio into a `.webm` video, with a **progress bar** and **cancel** option.
+
+---
+
+## License
+
+MIT License (or whichever license you prefer).  
+Feel free to modify and adapt this code for your own projects!

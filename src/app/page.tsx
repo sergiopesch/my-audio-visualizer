@@ -10,11 +10,11 @@ interface HTMLAudioElementWithCapture extends HTMLAudioElement {
 type Cell = {
   row: number;
   col: number;
-  dist: number; // distance from the center
+  dist: number;
 };
 
 export default function Page() {
-  // Refs for audio, canvas, and related audio nodes
+  // Refs for audio, canvas, etc.
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -22,64 +22,52 @@ export default function Page() {
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Refs for video export
+  // Export Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<BlobPart[]>([]);
 
-  // State for file, export, and playback
+  // File & playback states
   const [hasFile, setHasFile] = useState(false);
   const [audioURL, setAudioURL] = useState("");
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Audio timeline
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  // Export states
   const [isExporting, setIsExporting] = useState(false);
   const [exportCanceled, setExportCanceled] = useState(false);
   const [downloadLink, setDownloadLink] = useState<string | null>(null);
+  const [exportProgress, setExportProgress] = useState(0);
 
-  // Audio metadata and timeline
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1.0);
+  // Visualization settings
+  const cols = 10;
+  const rows = 7;
+  const canvasWidth = 600;
+  const canvasHeight = 400;
 
-  // Whether audio is playing (to know if we animate or keep white)
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  /**
-   * BIG PIXELS:
-   * Fewer columns/rows => each cell is bigger => more obvious usage of the canvas.
-   */
-  const COLS = 10;
-  const ROWS = 7;
-  const CANVAS_WIDTH = 600;
-  const CANVAS_HEIGHT = 400;
-
-  /**
-   * Precompute each cell’s distance from center so we can do a radial fill.
-   */
+  // Precompute cells and distances
   const cells: Cell[] = React.useMemo(() => {
     const arr: Cell[] = [];
-    const centerCol = Math.floor(COLS / 2);
-    const centerRow = Math.floor(ROWS / 2);
-
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
+    const centerCol = Math.floor(cols / 2);
+    const centerRow = Math.floor(rows / 2);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
         const dx = c - centerCol;
         const dy = r - centerRow;
         const dist = Math.sqrt(dx * dx + dy * dy);
         arr.push({ row: r, col: c, dist });
       }
     }
-    // Sort so the farthest cells are last
     arr.sort((a, b) => a.dist - b.dist);
     return arr;
-  }, [COLS, ROWS]);
-
-  // Maximum distance from the center to a corner cell
+  }, [cols, rows]);
   const maxDistance = cells.length > 0 ? cells[cells.length - 1].dist : 1;
 
-  /**
-   * Create the AudioContext & Analyser once we have a file. We do not animate yet.
-   */
+  // AudioContext + Analyser setup
   useEffect(() => {
     if (!hasFile) return;
-
     const audioEl = audioRef.current;
     if (!audioEl) return;
 
@@ -103,10 +91,7 @@ export default function Page() {
     }
   }, [hasFile]);
 
-  /**
-   * Each frame: fill the canvas with white if not playing; otherwise,
-   * measure peak amplitude, compute threshold => fill radial area from center.
-   */
+  // Main animation effect
   useEffect(() => {
     if (!hasFile) return;
 
@@ -123,53 +108,46 @@ export default function Page() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Always start with a white canvas
+      // White background
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // If not playing, no further drawing => remain white
       if (!isPlaying) return;
 
-      // If playing, measure PEAK amplitude => more "responsive"
       analyser.getByteFrequencyData(dataArray);
       let maxVal = 0;
       for (let i = 0; i < dataArray.length; i++) {
-        if (dataArray[i] > maxVal) {
-          maxVal = dataArray[i];
-        }
+        if (dataArray[i] > maxVal) maxVal = dataArray[i];
       }
-      // norm=1 => big radius
-      const norm = maxVal / 255;
+      const norm = maxVal / 255; // amplitude in [0..1]
       const threshold = norm * maxDistance;
 
-      // For each cell, if distance <= threshold => color it
-      const cellW = canvas.width / COLS;
-      const cellH = canvas.height / ROWS;
-
+      // Fill cells up to threshold
+      const cellW = canvas.width / cols;
+      const cellH = canvas.height / rows;
       for (const cell of cells) {
         if (cell.dist <= threshold) {
-          // fraction= cell.dist / threshold => 0..1
-          // Use fraction to pick a shade of futuristic blue
-          // center= dist=0 => fraction=0 => darkest (30%),
-          // near threshold => fraction=1 => lighter (80%).
           const fraction = threshold > 0 ? cell.dist / threshold : 0;
-          const hue = 200; // futuristic blue
-          const sat = 100;
-          const light = 30 + 50 * fraction; // from 30..80
-          ctx.fillStyle = `hsl(${hue}, ${sat}%, ${light}%)`;
+          // small flicker
+          const flicker = (Math.random() - 0.5) * 0.02;
+          let adjustedFrac = fraction + flicker;
+          adjustedFrac = Math.max(0, Math.min(1, adjustedFrac));
+
+          // Invert color from center(80%) to edge(30%)
+          const light = 80 - 50 * adjustedFrac;
+          ctx.fillStyle = `hsl(200, 100%, ${light}%)`;
           ctx.fillRect(cell.col * cellW, cell.row * cellH, cellW, cellH);
         }
       }
     }
 
     animationId = requestAnimationFrame(animate);
-
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [hasFile, cells, maxDistance, isPlaying, COLS, ROWS]);
+  }, [hasFile, isPlaying, cells, maxDistance, cols, rows]);
 
-  // File Handlers
+  // Drag & Drop / File Input
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
@@ -191,7 +169,7 @@ export default function Page() {
     setHasFile(true);
   };
 
-  // Audio event setup
+  // Audio timeline & events
   useEffect(() => {
     if (!hasFile) return;
     const audioEl = audioRef.current;
@@ -228,9 +206,7 @@ export default function Page() {
       await audioContextRef.current.resume();
     }
     setIsPlaying(true);
-    audioRef.current?.play().catch((err) => {
-      console.error("Playback error:", err);
-    });
+    audioRef.current?.play().catch((err) => console.error(err));
   };
 
   const handlePause = () => {
@@ -246,13 +222,6 @@ export default function Page() {
     setIsPlaying(false);
   };
 
-  const handleRateChange = (r: number) => {
-    setPlaybackRate(r);
-    if (audioRef.current) {
-      audioRef.current.playbackRate = r;
-    }
-  };
-
   const handleTimelineChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
     if (audioRef.current) {
@@ -261,7 +230,19 @@ export default function Page() {
     setCurrentTime(newTime);
   };
 
-  // Export
+  // Export progress logic
+  useEffect(() => {
+    if (!isExporting) {
+      setExportProgress(0);
+      return;
+    }
+    if (duration > 0) {
+      const prog = (currentTime / duration) * 100;
+      setExportProgress(Math.min(100, Math.floor(prog)));
+    }
+  }, [currentTime, duration, isExporting]);
+
+  // Export to .webm
   const handleExportVideo = () => {
     const canvas = canvasRef.current;
     const audioEl = audioRef.current as HTMLAudioElementWithCapture | null;
@@ -270,6 +251,7 @@ export default function Page() {
     setExportCanceled(false);
     setIsExporting(true);
     setDownloadLink(null);
+    setExportProgress(0);
 
     const canvasStream = canvas.captureStream(30);
     const audioStream =
@@ -329,7 +311,7 @@ export default function Page() {
   };
 
   return (
-    <main className="max-w-4xl mx-auto p-6 flex flex-col items-center space-y-8 min-h-screen bg-gray-50">
+    <main className="min-h-screen w-full bg-white text-gray-800 flex flex-col items-center p-6 space-y-6">
       {!hasFile && (
         <div
           onDrop={handleDrop}
@@ -343,123 +325,139 @@ export default function Page() {
             type="file"
             accept="audio/*"
             onChange={handleFileSelect}
-            className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+            className="file:cursor-pointer file:border-0 file:rounded-full file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300 file:px-4 file:py-2"
           />
         </div>
       )}
 
       {hasFile && (
-        <div className="w-full flex flex-col items-center space-y-6">
-          <div className="relative shadow-md rounded-md bg-white inline-block">
-            <canvas
-              ref={canvasRef}
-              width={CANVAS_WIDTH}
-              height={CANVAS_HEIGHT}
-              className="block"
-            />
-          </div>
+        <>
+          <div className="w-full max-w-xl flex flex-col items-center space-y-6">
+            <div className="relative shadow-md rounded-md bg-gray-50 inline-block">
+              <canvas
+                ref={canvasRef}
+                width={canvasWidth}
+                height={canvasHeight}
+                className="block"
+              />
+            </div>
 
-          {/* Playback controls */}
-          <div className="flex flex-col items-center space-y-4">
-            <div className="flex flex-row items-center space-x-3">
-              <button
-                onClick={handlePlay}
-                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Play
-              </button>
-              <button
-                onClick={handlePause}
-                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Pause
-              </button>
-              <button
-                onClick={handleStop}
-                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Stop
-              </button>
+            {/* Playback controls */}
+            <div className="flex flex-col items-center space-y-4">
+              <div className="flex flex-row items-center space-x-6">
+                <button
+                  onClick={handlePlay}
+                  className="text-gray-500 hover:text-black focus:outline-none"
+                  aria-label="Play"
+                >
+                  <svg fill="currentColor" viewBox="0 0 24 24" width="34" height="34">
+                    <path d="M7 6v12l10-6z" />
+                  </svg>
+                </button>
 
-              <label className="flex items-center space-x-1 text-sm text-gray-600">
-                <span>Speed</span>
+                <button
+                  onClick={handlePause}
+                  className="text-gray-500 hover:text-black focus:outline-none"
+                  aria-label="Pause"
+                >
+                  <svg fill="currentColor" viewBox="0 0 24 24" width="34" height="34">
+                    <path d="M6 19h4V5H6zm8-14v14h4V5z" />
+                  </svg>
+                </button>
+
+                <button
+                  onClick={handleStop}
+                  className="text-gray-500 hover:text-black focus:outline-none"
+                  aria-label="Stop"
+                >
+                  <svg fill="currentColor" viewBox="0 0 24 24" width="30" height="30">
+                    <path d="M6 6h12v12H6z" />
+                  </svg>
+                </button>
+
+                {!isExporting && (
+                  <button
+                    onClick={handleExportVideo}
+                    className="text-gray-500 hover:text-black focus:outline-none"
+                    aria-label="Export"
+                  >
+                    <svg
+                      fill="currentColor"
+                      width="30"
+                      height="30"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M5 20h14v-2H5m7-14v8l5-4.999z" />
+                    </svg>
+                  </button>
+                )}
+                {isExporting && (
+                  <button
+                    onClick={handleCancelExport}
+                    className="text-gray-500 hover:text-black focus:outline-none"
+                    aria-label="Cancel Export"
+                  >
+                    <svg
+                      fill="currentColor"
+                      width="32"
+                      height="32"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M20.84 4.61l-1.45-1.45L12 10.54 4.61 3.16 3.16 4.61l7.39 7.39-7.39 7.39 1.45 1.45 7.39-7.39 7.39 7.39 1.45-1.45L13.46 12z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Timeline slider */}
+              <div className="w-full max-w-sm flex flex-col items-center space-y-1">
                 <input
                   type="range"
-                  min={0.5}
-                  max={2.0}
-                  step={0.1}
-                  value={playbackRate}
-                  onChange={(e) => handleRateChange(parseFloat(e.target.value))}
-                  className="cursor-pointer"
+                  min={0}
+                  max={duration}
+                  step={0.01}
+                  value={currentTime}
+                  onChange={handleTimelineChange}
+                  className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer range-thumb"
                 />
-                <span>{playbackRate.toFixed(1)}x</span>
-              </label>
-
-              {!isExporting && (
-                <button
-                  onClick={handleExportVideo}
-                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Export
-                </button>
-              )}
-              {isExporting && (
-                <button
-                  onClick={handleCancelExport}
-                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-
-            {/* Timeline */}
-            <div className="w-full max-w-md">
-              <input
-                type="range"
-                min={0}
-                max={duration}
-                step={0.01}
-                value={currentTime}
-                onChange={handleTimelineChange}
-                className="w-full cursor-pointer"
-              />
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>{currentTime.toFixed(1)}s</span>
-                <span>{duration.toFixed(1)}s</span>
+                <div className="w-full flex justify-between text-xs text-gray-500">
+                  <span>{currentTime.toFixed(1)}s</span>
+                  <span>{duration.toFixed(1)}s</span>
+                </div>
               </div>
             </div>
+
+            {/* Export progress & link */}
+            {isExporting && (
+              <div className="flex flex-col items-center space-y-1 w-full max-w-sm">
+                <p className="text-xs text-gray-500">Exporting...</p>
+                <div className="w-full h-2 bg-gray-200 rounded overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 transition-all duration-150"
+                    style={{
+                      width: `${exportProgress}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {downloadLink && (
+              <div className="mt-2 flex flex-col items-center space-y-2">
+                <p className="text-xs text-gray-500">Export complete!</p>
+                <a
+                  href={downloadLink}
+                  download="visualizerCapture.webm"
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-400 text-sm"
+                >
+                  Download
+                </a>
+              </div>
+            )}
           </div>
 
-          {/* Export progress and download link */}
-          {isExporting && (
-            <div className="flex flex-col items-center space-y-1">
-              <div className="w-full max-w-md h-2 bg-gray-200 rounded overflow-hidden">
-                <div
-                  className="h-full bg-blue-600 transition-all duration-150"
-                  style={{
-                    width: `${(currentTime / (duration || 1)) * 100}%`,
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {downloadLink && (
-            <div className="mt-4 flex flex-col items-center space-y-2">
-              <p className="text-sm text-gray-600">Export complete!</p>
-              <a
-                href={downloadLink}
-                download="visualizerCapture.webm"
-                className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700"
-              >
-                Download .webm
-              </a>
-            </div>
-          )}
-
-          <audio ref={audioRef} />
-        </div>
+          <audio ref={audioRef} className="hidden" />
+        </>
       )}
     </main>
   );
