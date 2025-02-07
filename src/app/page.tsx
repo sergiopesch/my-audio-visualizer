@@ -97,6 +97,7 @@ export default function Page() {
 
     let animationId: number;
 
+    // Move the animation function outside to avoid recreating it on every render
     function animate() {
       animationId = requestAnimationFrame(animate);
 
@@ -125,13 +126,19 @@ export default function Page() {
       // Fill cells up to threshold
       const cellW = canvas.width / cols;
       const cellH = canvas.height / rows;
+      
+      // Only apply flicker effect if we're in the browser
+      const isClient = typeof window !== 'undefined';
+      
       for (const cell of cells) {
         if (cell.dist <= threshold) {
           const fraction = threshold > 0 ? cell.dist / threshold : 0;
-          // small flicker
-          const flicker = (Math.random() - 0.5) * 0.02;
-          let adjustedFrac = fraction + flicker;
-          adjustedFrac = Math.max(0, Math.min(1, adjustedFrac));
+          // Only add flicker on client-side
+          let adjustedFrac = fraction;
+          if (isClient && isPlaying) {
+            const flicker = (Math.random() - 0.5) * 0.02;
+            adjustedFrac = Math.max(0, Math.min(1, fraction + flicker));
+          }
 
           // Invert color from center(80%) to edge(30%)
           const light = 80 - 50 * adjustedFrac;
