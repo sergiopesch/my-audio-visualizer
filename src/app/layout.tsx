@@ -13,8 +13,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "My Audio Visualizer",
-  description: "Audio Visualizer Pixel Art",
+  title: "Audio Visualizer",
+  description: "Real-time audio visualization with radial ripple effects. Drop your music and watch it come alive.",
+  keywords: ["audio", "visualizer", "music", "web audio", "canvas", "ripple", "visualization"],
+  authors: [{ name: "Audio Visualizer" }],
+  openGraph: {
+    title: "Audio Visualizer",
+    description: "Real-time audio visualization with radial ripple effects",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
