@@ -1,17 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <!-- Background -->
   <rect width="32" height="32" rx="6" fill="#ffffff"/>
-
-  <!-- Radial ripple visualization - concentric arcs representing audio waves -->
-  <!-- Center dot -->
-  <circle cx="16" cy="16" r="2" fill="hsl(200, 100%, 80%)"/>
-
-  <!-- Inner ring -->
-  <circle cx="16" cy="16" r="5" fill="none" stroke="hsl(200, 100%, 70%)" stroke-width="2"/>
-
-  <!-- Middle ring -->
-  <circle cx="16" cy="16" r="9" fill="none" stroke="hsl(200, 100%, 55%)" stroke-width="2"/>
-
-  <!-- Outer ring -->
-  <circle cx="16" cy="16" r="13" fill="none" stroke="hsl(200, 100%, 40%)" stroke-width="2"/>
+  <circle cx="16" cy="16" r="2" fill="#99d6ff"/>
+  <circle cx="16" cy="16" r="5" fill="none" stroke="#66c2ff" stroke-width="2"/>
+  <circle cx="16" cy="16" r="9" fill="none" stroke="#1a8cff" stroke-width="2"/>
+  <circle cx="16" cy="16" r="13" fill="none" stroke="#0066cc" stroke-width="2"/>
 </svg>
