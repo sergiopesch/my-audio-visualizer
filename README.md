@@ -1,60 +1,58 @@
-# My Audio Visualizer
+# Audio Visualizer
 
-A real-time audio visualizer built with Next.js that creates a radial ripple effect synchronized to your music. Export your visualizations as WebM videos.
+A real-time audio visualizer built with Next.js. Capture system audio or upload a file to see a radial ripple visualization on a dark canvas. Export your visualizations as WebM videos.
 
 ![Audio Visualizer Demo](public/Screen_Recording.gif)
 
 ## Features
 
-- **Drag & Drop**: Load audio files by dragging them onto the interface
-- **Radial Ripple Visualization**: Audio amplitude drives a grid-based ripple effect from the center outward
-- **Playback Controls**: Play, pause, stop, and timeline scrubbing
-- **Video Export**: Record visualization + audio to WebM format with progress tracking
+- **System Audio Capture**: Visualize audio from any browser tab or application via `getDisplayMedia`
+- **File Upload**: Drag & drop or browse for audio files
+- **Radial Ripple Visualization**: Amplitude-driven grid cells illuminate from center outward with a blue-cyan gradient on a dark canvas
+- **Adjustable Settings**: Real-time sensitivity and pixel size controls
+- **Playback Controls**: Play/pause toggle, stop, and timeline scrubbing (file mode)
+- **Video Export**: Record visualization + audio to WebM with progress tracking (file mode)
+- **Dark UI**: Glassmorphism cards, ambient canvas glow, custom-styled controls
 
 ## Tech Stack
 
 - [Next.js 15](https://nextjs.org/) - React framework with App Router
 - [React 19](https://react.dev/) - UI library
-- [TypeScript](https://www.typescriptlang.org/) - Type safety
-- [Tailwind CSS](https://tailwindcss.com/) - Styling
-- Web Audio API - Audio analysis
+- [TypeScript 5](https://www.typescriptlang.org/) - Type safety
+- [Tailwind CSS 3.4](https://tailwindcss.com/) - Styling
+- Web Audio API - Audio analysis via `AnalyserNode`
 - Canvas API - Visualization rendering
 - MediaRecorder API - Video export
+- Screen Capture API - System audio via `getDisplayMedia`
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
-- SSL certificates for local HTTPS (required for video export)
+- SSL certificates for local HTTPS (required for system audio capture and video export)
 
 ### Generate SSL Certificates
 
-The video export feature requires HTTPS. Generate local certificates using [mkcert](https://github.com/FiloSottile/mkcert):
+Generate local certificates using [mkcert](https://github.com/FiloSottile/mkcert):
 
 ```bash
 # Install mkcert (macOS)
 brew install mkcert
 mkcert -install
 
-# Generate certificates
+# Generate certificates in the project root
 mkcert localhost
-# Rename to expected filenames
-mv localhost.pem localhost.pem
-mv localhost-key.pem localhost-key.pem
 ```
+
+This creates `localhost.pem` and `localhost-key.pem` in the project directory.
 
 ### Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/sergiopesch/my-audio-visualizer.git
 cd my-audio-visualizer
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 ```
 
@@ -62,20 +60,27 @@ Open [https://localhost:3000](https://localhost:3000) in your browser.
 
 ## Usage
 
-1. **Load Audio**: Drag and drop an audio file onto the drop zone, or click to browse
-2. **Play**: Click the play button to start visualization
-3. **Control**: Use pause/stop buttons or scrub the timeline
-4. **Export**: Click the export button to record your visualization as a WebM video
+1. **Choose a source**: Select "System Audio" to capture from a tab/app, or "Upload File" to load an audio file
+2. **System Audio**: Grant screen sharing permission (check "Share audio"), and the visualizer starts immediately
+3. **File Mode**: Use play/pause, stop, and the timeline to control playback
+4. **Settings**: Click the settings icon to adjust sensitivity and pixel size in real-time
+5. **Export** (file mode): Click the download icon to record as WebM video
 
 ## How It Works
 
-The visualizer uses the Web Audio API to analyze frequency data in real-time:
+1. Audio is routed through an `AnalyserNode` (FFT size 1024, smoothing 0.3)
+2. Frequency data determines the peak amplitude, normalized to `[0, 1]`
+3. Amplitude is scaled by the sensitivity multiplier to set a threshold
+4. Grid cells within the threshold illuminate from center outward
+5. HSL colors shift from bright cyan (center) to deep blue (edges)
+6. 1px gaps between cells and subtle flicker add depth
 
-1. Audio is routed through an `AnalyserNode` with FFT analysis
-2. Frequency data determines the amplitude threshold
-3. A 10x7 grid of cells illuminates from center outward based on amplitude
-4. HSL colors create a gradient from light blue (center) to deep blue (edges)
-5. Subtle flicker effects add organic movement
+### Audio Sources
+
+| Source | API | Pipeline |
+|--------|-----|----------|
+| System | `getDisplayMedia({ audio: true })` | MediaStream -> MediaStreamSource -> AnalyserNode |
+| File | `<audio>` element | Audio element -> MediaElementSource -> AnalyserNode -> destination |
 
 ## Scripts
 
@@ -89,10 +94,10 @@ The visualizer uses the Web Audio API to analyze frequency data in real-time:
 ## Browser Support
 
 - Chrome/Edge 80+
-- Firefox 76+
-- Safari 14+
+- Firefox 76+ (system audio may require additional flags)
+- Safari 14+ (limited `getDisplayMedia` audio support)
 
-Note: Video export requires browser support for `HTMLMediaElement.captureStream()`.
+System audio capture requires `getDisplayMedia` with audio support. Video export requires `HTMLMediaElement.captureStream()`.
 
 ## License
 

@@ -2,7 +2,7 @@
 
 ## Mission
 
-Build and maintain a real-time audio visualizer web application. Users drag-and-drop audio files to see a radial ripple visualization driven by frequency data, with the ability to export the result as a WebM video.
+Build and maintain a real-time audio visualizer web application. Users can capture system audio or upload files to see a radial ripple visualization, with adjustable settings and WebM video export.
 
 ## Principles
 
@@ -15,10 +15,10 @@ Build and maintain a real-time audio visualizer web application. Users drag-and-
 
 ```
 src/app/
-  page.tsx        # Main client component (all visualization logic)
+  page.tsx        # Main client component (all logic: audio, canvas, UI)
   layout.tsx      # Root layout with metadata
-  globals.css     # Tailwind and CSS variables
-server.js         # Custom HTTPS server (required for MediaRecorder)
+  globals.css     # Design system: CSS variables, glass effects, animations, custom inputs
+server.js         # Custom HTTPS server (required for getDisplayMedia and MediaRecorder)
 ```
 
 Single-page architecture: all application logic lives in `src/app/page.tsx`.
@@ -27,25 +27,43 @@ Single-page architecture: all application logic lives in `src/app/page.tsx`.
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript 5
 - **UI**: React 19, Tailwind CSS 3.4
-- **Browser APIs**: Web Audio API (AnalyserNode), Canvas API, MediaRecorder API
+- **Browser APIs**: Web Audio API, Canvas API, MediaRecorder API, Screen Capture API
 
-### Audio pipeline
+### Audio pipeline (dual-source)
+
+**System audio:**
 ```
-Audio file -> <audio> element -> AudioContext -> MediaElementSource -> AnalyserNode -> FFT data -> Canvas rendering
+getDisplayMedia({ audio: true }) -> MediaStream -> MediaStreamSource -> AnalyserNode -> Canvas
 ```
+
+**File upload:**
+```
+<audio> element -> MediaElementSource -> AnalyserNode -> destination -> Canvas
+```
+
+Both sources connect to the same `AnalyserNode`. System audio does not route to destination (avoids echo).
 
 ### Visualization
-- 10x7 grid of cells, sorted by distance from center
-- Cells illuminate outward based on amplitude threshold
-- HSL color gradient: light blue (center, 80%) to deep blue (edges, 30%)
+- Dynamic grid: cols/rows computed from `canvasWidth / pixelSize`
+- Dark canvas background (`#09090b`) with 1px gaps between cells
+- Blue-cyan HSL gradient: hue 200-220, bright center to deep edges
+- Sensitivity multiplier scales the amplitude threshold
 - Subtle random flicker for organic feel
+
+### UI design system (`globals.css`)
+- Pure black (`#000`) base with CSS custom properties
+- `.glass` class: glassmorphism with `backdrop-filter: blur(12px)`
+- `.canvas-glow` / `.canvas-glow.active`: ambient glow around canvas
+- Custom range slider styling with glowing blue thumb
+- `.animate-fade-in`: entry animation for views
+- `.live-dot`: pulse-glow animation for system audio indicator
 
 ## Constraints
 
-- **HTTPS required**: MediaRecorder audio capture requires secure context. The custom `server.js` handles this with local SSL certs (`localhost-key.pem`, `localhost.pem`)
-- **No external UI libraries**: Use only Tailwind CSS
-- **No state management libraries**: React hooks only (`useState`, `useRef`, `useCallback`, `useMemo`)
-- **Single-component architecture**: Keep all logic in `page.tsx` unless complexity demands splitting
+- **HTTPS required**: Both `getDisplayMedia` and `MediaRecorder` require secure context
+- **No external UI libraries**: Tailwind CSS + custom CSS only
+- **No state management libraries**: React hooks only
+- **Single-component architecture**: All logic in `page.tsx` unless complexity demands splitting
 - **Browser support**: Chrome/Edge 80+, Firefox 76+, Safari 14+
 
 ## Engineering standards
@@ -54,7 +72,7 @@ Audio file -> <audio> element -> AudioContext -> MediaElementSource -> AnalyserN
 - Clear, readable code over clever code
 - No unnecessary abstractions for one-time operations
 - Test with various audio files and formats after changes
-- Verify export functionality after any audio/canvas changes
+- Verify both system audio and file upload modes after changes
 
 ## Workflow
 
@@ -74,13 +92,16 @@ npm run build   # Production build succeeds
 ```
 
 ### Manual verification checklist
+- System audio capture works (with "Share audio" enabled)
 - Audio drag-and-drop works
 - File input selection works
-- Play/Pause/Stop controls function
-- Timeline scrubbing works
-- Visualization renders during playback
-- Export to WebM completes
+- Play/Pause/Stop controls function (file mode)
+- Timeline scrubbing works (file mode)
+- Visualization renders during playback (both modes)
+- Settings panel: sensitivity and pixel size adjust in real-time
+- Export to WebM completes (file mode)
 - Cancel export works during recording
+- Back button returns to source picker and cleans up resources
 
 ## Documentation
 
