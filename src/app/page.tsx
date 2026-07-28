@@ -20,7 +20,7 @@ export default function Page() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const dataArrayRef = useRef<Uint8Array | null>(null);
+  const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const systemStreamRef = useRef<MediaStream | null>(null);
 
