@@ -10,6 +10,11 @@
 
 # Testing
 /coverage
+/.playwright-cli/
+/output/*
+!/output/playwright/
+/output/playwright/*
+!/output/playwright/av01-studio-readme.png
 
 # Next.js
 /.next/
@@ -37,7 +42,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Local SSL certificates (for HTTPS dev)
+# Local certificates (for optional proxies or deployment testing)
 *.crt
 *.key
 *.pem

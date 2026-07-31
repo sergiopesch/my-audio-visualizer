@@ -1,27 +1,46 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { DM_Mono, Unbounded } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const display = Unbounded({
+  variable: "--font-unbounded",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const mono = DM_Mono({
+  variable: "--font-dm-mono",
   subsets: ["latin"],
+  weight: ["300", "400", "500"],
 });
 
 export const metadata: Metadata = {
-  title: "Audio Visualizer",
-  description: "Real-time audio visualization with radial ripple effects. Drop your music and watch it come alive.",
-  keywords: ["audio", "visualizer", "music", "web audio", "canvas", "ripple", "visualization"],
+  title: "AV/01 — Audio Visualizer",
+  description:
+    "A local-first visual instrument that transforms rhythm, timbre and texture into living GPU scenes.",
+  applicationName: "AV/01 Audio Visualizer",
+  keywords: [
+    "audio visualizer",
+    "music visualizer",
+    "Web Audio",
+    "real-time graphics",
+    "audio reactive",
+    "creative coding",
+  ],
   authors: [{ name: "Audio Visualizer" }],
+  category: "music",
   openGraph: {
-    title: "Audio Visualizer",
-    description: "Real-time audio visualization with radial ripple effects",
+    title: "AV/01 — Sound, seen.",
+    description: "A real-time visual instrument for music, system audio and live input.",
     type: "website",
   },
+};
+
+export const viewport: Viewport = {
+  colorScheme: "dark",
+  themeColor: "#050806",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -31,11 +50,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+      <body className={`${display.variable} ${mono.variable}`}>{children}</body>
     </html>
   );
 }

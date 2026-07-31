@@ -8,10 +8,11 @@
   },
   "scripts": {
     "audit:ci": "node scripts/audit-ci.mjs",
-    "dev": "node server.js",
+    "dev": "next dev",
     "build": "next build",
-    "start": "node server.js",
-    "lint": "eslint ."
+    "start": "next start",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "next": "^15.5.21",
