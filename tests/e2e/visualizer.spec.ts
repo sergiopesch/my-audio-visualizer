@@ -13,6 +13,21 @@ function captureRuntimeFailures(page: Page): string[] {
   return failures;
 }
 
+async function enableCanvas2dFallback(page: Page): Promise<void> {
+  // Keep fixed-duration signal history independent of software-WebGL throughput in CI.
+  await page.addInitScript(() => {
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+      configurable: true,
+      writable: true,
+      value(this: HTMLCanvasElement, contextId: string, ...args: unknown[]) {
+        if (contextId === "webgl2") return null;
+        return Reflect.apply(originalGetContext, this, [contextId, ...args]);
+      },
+    });
+  });
+}
+
 async function openFixture(page: Page, fileName: string): Promise<void> {
   await expect(page.locator("canvas.stage-canvas")).toHaveAttribute(
     "data-renderer",
@@ -47,10 +62,12 @@ test("landing experience is hydrated, explicit, and responsive", async ({ page }
 
 test("sustained tone remains spectral evidence, never a periodicity claim", async ({ page }) => {
   const failures = captureRuntimeFailures(page);
+  await enableCanvas2dFallback(page);
   await page.goto("/");
   await openFixture(page, "tone-6000hz-rms025.wav");
 
   const stage = page.locator("canvas.stage-canvas");
+  await expect(stage).toHaveAttribute("data-renderer", "canvas2d");
   await page.getByRole("radio", { name: "Rhythm Lattice" }).click();
   await page.getByRole("button", { name: "Play audio" }).click();
   await expect.poll(
@@ -87,12 +104,14 @@ test("sustained tone remains spectral evidence, never a periodicity claim", asyn
 
 test("periodic transients separate from the matched aperiodic control", async ({ page }, testInfo) => {
   const failures = captureRuntimeFailures(page);
+  await enableCanvas2dFallback(page);
   await page.goto("/");
   await openFixture(page, "pulses-120bpm-equivalent.wav");
   await page.getByRole("radio", { name: "Rhythm Lattice" }).click();
   await page.getByRole("button", { name: "Play audio" }).click();
 
   const stage = page.locator("canvas.stage-canvas");
+  await expect(stage).toHaveAttribute("data-renderer", "canvas2d");
   await expect.poll(
     async () => Number(await stage.getAttribute("data-analysis-sequence")),
     { timeout: 8_000 },

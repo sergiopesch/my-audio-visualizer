@@ -17,6 +17,8 @@ The release suite currently contains 34 deterministic tests across three unit-te
 - 4 scene-contract tests for non-overlapping feature ownership, visible limitations, WebGL evidence isolation and the absence of autonomous clocks, noise and grain.
 - 3 Chromium end-to-end tests for hydration/provenance/mobile overflow, the sustained-tone negative control, all five scene routes, stop/reset and the periodic-versus-jittered transient control.
 
+The landing journey keeps the browser's default renderer path. The two fixed-duration signal journeys deliberately select AV/01's production Canvas 2D fallback before navigation. That prevents a CI runner's software-WebGL throughput from shortening the evidence history while leaving the WAV fixture, `AnalyserNode`, analysis timer, feature bus and every scientific threshold unchanged.
+
 The required release commands are:
 
 ```bash
@@ -86,7 +88,7 @@ The committed regression matrix now covers production smoothing at 90, 120, 180 
 | --- | --- | --- |
 | `AV01-VAL-001` deterministic numerical fixtures | **Pass** | 34/34 unit tests, including production-smoothed 90/120/180/200 BPM-equivalent cases, transient-gate adversarial controls and tone-to-silence clearing |
 | `AV01-VAL-002` signal-family fixtures | **Pass** | Nine reproducible WAV fixtures, hash verification and 3/3 optimized Chromium end-to-end gates |
-| `AV01-VAL-003` scene-contract routing | **Pass** | Non-overlapping feature declarations and WebGL block-isolation tests; Canvas routing reviewed against the same contract |
+| `AV01-VAL-003` scene-contract routing | **Pass** | Non-overlapping feature declarations and WebGL block-isolation tests; Canvas routing exercised by optimized-browser signal gates against the same contract |
 | `AV01-VAL-004` browser integration | **Partial** | Local-file provenance, decoded rate, FFT/window disclosure, Canvas 2D and WebGL 2 passed in the recorded browser; system capture and microphone permission/settings were not exercised |
 | `AV01-VAL-005` reset/seek/source lifecycle | **Pass** | Reset unit tests plus source, stop, replay-from-end and export restoration checks |
 | `AV01-VAL-006` export provenance | **Pass** | Full local-file WebGL render completed through the shared measured graph |

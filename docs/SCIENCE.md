@@ -407,7 +407,7 @@ The following statuses summarize the recorded [release-candidate evidence](VALID
 | --- | --- | --- | --- |
 | `AV01-VAL-001` | Deterministic unit fixtures | ERB transforms, pitch-class folding, entropy, periodicity and similarity match controlled numerical expectations | Pass · 34/34 tests |
 | `AV01-VAL-002` | Signal-family fixtures | Browser sines, silent intervals, octave pairs, transient trains and repeated spectral shapes—plus unit-level impulse and silence controls—drive the intended descriptors without NaN/Infinity | Pass · nine deterministic browser fixtures plus unit controls |
-| `AV01-VAL-003` | Scene-contract routing | Each scene consumes its declared primary representation and exposes the stated limitation | Pass · WebGL isolation tests and Canvas contract review |
+| `AV01-VAL-003` | Scene-contract routing | Each scene consumes its declared primary representation and exposes the stated limitation | Pass · WebGL isolation tests plus optimized-browser Canvas fallback signal gates |
 | `AV01-VAL-004` | Browser integration | The tested path reports coherent sample rate, FFT size, source provenance and renderer state | Partial · 3/3 Chromium end-to-end gates plus recorded Canvas 2D and WebGL 2 local-file paths pass; live capture not exercised |
 | `AV01-VAL-005` | Reset/seek/source lifecycle | Stateful rhythm and similarity history reset instead of leaking across discontinuities or sources | Pass · source, stop, replay and export restoration |
 | `AV01-VAL-006` | Export provenance | Preview and recording use the same measured feature frames and scene contract | Pass · full 1280 × 720 WebGL WebM render |

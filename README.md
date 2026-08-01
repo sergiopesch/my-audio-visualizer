@@ -60,7 +60,7 @@ Every scene can be combined with four color systems and three output frames. Sen
 
 ## The differentiator: representation, not skin
 
-AV/01 is not five cosmetic treatments of one FFT. Each scene owns a non-overlapping evidence family. Automated contract tests enforce the declarations and scan every WebGL scene for cross-scene evidence access; the Canvas fallback is reviewed against the same ownership map. Matched controls then change one signal property at a time:
+AV/01 is not five cosmetic treatments of one FFT. Each scene owns a non-overlapping evidence family. Automated contract tests enforce the declarations and scan every WebGL scene for cross-scene evidence access; optimized-browser signal gates exercise the real Canvas 2D fallback against the same ownership map, keeping fixed-duration evidence histories independent of software-GPU throughput. Matched controls then change one signal property at a time:
 
 | Controlled comparison | Representation expected to change | Evidence expected to remain stable |
 | --- | --- | --- |
