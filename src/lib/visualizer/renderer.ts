@@ -1,6 +1,6 @@
 import type { FeatureFrame } from "@/lib/audio";
 import { FULLSCREEN_VERTEX_SHADER, SPECTRAL_FRAGMENT_SHADER } from "./shaders";
-import { findPalette, findScene, type VisualSettings } from "./types";
+import { findOpticalSystem, findScene, type VisualSettings } from "./types";
 
 export type RendererKind = "webgl2" | "canvas2d";
 
@@ -179,6 +179,8 @@ class WebGLSpectralRenderer implements SpectralRenderer {
   private readonly waveform = new Float32Array(WAVEFORM_SIZE);
   private readonly similarityData = new Float32Array(SIMILARITY_SIZE * SIMILARITY_SIZE);
   private readonly similarityTexture: WebGLTexture;
+  private lastSimilarityHead = Number.NaN;
+  private lastSimilarityCount = -1;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", {
@@ -251,9 +253,8 @@ class WebGLSpectralRenderer implements SpectralRenderer {
     copyResampled(frame.bands, this.bands);
     copyResampled(frame.chroma, this.chroma);
     copyResampled(frame.waveform, this.waveform);
-    rebuildChronologicalSimilarity(frame, this.similarityData);
 
-    const palette = findPalette(settings.palette);
+    const opticalSystem = findOpticalSystem(settings.opticalSystem);
     const scene = findScene(settings.scene);
     const centroidPosition = frequencyBandPosition(frame, frame.spectralCentroidHz);
     const rolloffPosition = frequencyBandPosition(frame, frame.spectralRolloffHz);
@@ -266,17 +267,26 @@ class WebGLSpectralRenderer implements SpectralRenderer {
     gl.useProgram(this.program);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.similarityTexture);
-    gl.texSubImage2D(
-      gl.TEXTURE_2D,
-      0,
-      0,
-      0,
-      SIMILARITY_SIZE,
-      SIMILARITY_SIZE,
-      gl.RED,
-      gl.FLOAT,
-      this.similarityData,
-    );
+    if (
+      scene.id === "contour" &&
+      (frame.selfSimilarityHead !== this.lastSimilarityHead ||
+        frame.selfSimilarityCount !== this.lastSimilarityCount)
+    ) {
+      rebuildChronologicalSimilarity(frame, this.similarityData);
+      gl.texSubImage2D(
+        gl.TEXTURE_2D,
+        0,
+        0,
+        0,
+        SIMILARITY_SIZE,
+        SIMILARITY_SIZE,
+        gl.RED,
+        gl.FLOAT,
+        this.similarityData,
+      );
+      this.lastSimilarityHead = frame.selfSimilarityHead;
+      this.lastSimilarityCount = frame.selfSimilarityCount;
+    }
     gl.uniform1i(this.uniforms.similarity, 0);
     gl.uniform2f(this.uniforms.resolution, this.canvas.width, this.canvas.height);
     gl.uniform1i(this.uniforms.scene, scene.index);
@@ -332,10 +342,10 @@ class WebGLSpectralRenderer implements SpectralRenderer {
       this.uniforms.highlightCompression,
       settings.highlightCompression ? 1 : 0,
     );
-    gl.uniform3f(this.uniforms.background, ...palette.background);
-    gl.uniform3f(this.uniforms.primary, ...palette.primary);
-    gl.uniform3f(this.uniforms.secondary, ...palette.secondary);
-    gl.uniform3f(this.uniforms.accent, ...palette.accent);
+    gl.uniform3f(this.uniforms.background, ...opticalSystem.background);
+    gl.uniform3f(this.uniforms.primary, ...opticalSystem.primary);
+    gl.uniform3f(this.uniforms.secondary, ...opticalSystem.secondary);
+    gl.uniform3f(this.uniforms.accent, ...opticalSystem.accent);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
@@ -344,6 +354,8 @@ class WebGLSpectralRenderer implements SpectralRenderer {
     this.chroma.fill(0);
     this.waveform.fill(0);
     this.similarityData.fill(0);
+    this.lastSimilarityHead = Number.NaN;
+    this.lastSimilarityCount = -1;
     const gl = this.gl;
     if (gl.isContextLost()) return;
     gl.activeTexture(gl.TEXTURE0);
@@ -373,23 +385,6 @@ function cssColor(color: readonly [number, number, number], alpha = 1): string {
   )}, ${alpha})`;
 }
 
-function mixColor(
-  first: readonly [number, number, number],
-  second: readonly [number, number, number],
-  amount: number,
-  alpha: number,
-): string {
-  const mix = clampUnit(amount);
-  return cssColor(
-    [
-      first[0] * (1 - mix) + second[0] * mix,
-      first[1] * (1 - mix) + second[1] * mix,
-      first[2] * (1 - mix) + second[2] * mix,
-    ],
-    alpha,
-  );
-}
-
 class CanvasSpectralRenderer implements SpectralRenderer {
   readonly kind = "canvas2d" as const;
   private readonly context: CanvasRenderingContext2D;
@@ -406,8 +401,8 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     const context = this.context;
     const width = this.canvas.width;
     const height = this.canvas.height;
-    const palette = findPalette(settings.palette);
-    context.fillStyle = cssColor(palette.background);
+    const opticalSystem = findOpticalSystem(settings.opticalSystem);
+    context.fillStyle = cssColor(opticalSystem.background);
     context.fillRect(0, 0, width, height);
     context.save();
     context.lineCap = "round";
@@ -418,15 +413,15 @@ class CanvasSpectralRenderer implements SpectralRenderer {
       : 4 + settings.bloom * 18;
 
     if (settings.scene === "field") {
-      this.drawField(frame, settings, palette, width, height);
+      this.drawField(frame, settings, opticalSystem, width, height);
     } else if (settings.scene === "orbit") {
-      this.drawOrbit(frame, settings, palette, width, height);
+      this.drawOrbit(frame, settings, opticalSystem, width, height);
     } else if (settings.scene === "trace") {
-      this.drawTrace(frame, settings, palette, width, height);
+      this.drawTrace(frame, settings, opticalSystem, width, height);
     } else if (settings.scene === "lattice") {
-      this.drawLattice(frame, settings, palette, width, height);
+      this.drawLattice(frame, settings, opticalSystem, width, height);
     } else {
-      this.drawContour(frame, settings, palette, width, height);
+      this.drawContour(frame, settings, opticalSystem, width, height);
     }
     context.restore();
   }
@@ -434,7 +429,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
   private drawField(
     frame: FeatureFrame,
     settings: VisualSettings,
-    palette: ReturnType<typeof findPalette>,
+    opticalSystem: ReturnType<typeof findOpticalSystem>,
     width: number,
     height: number,
   ): void {
@@ -451,12 +446,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
       const amplitude = Math.sqrt(clampUnit(frame.bands[index] * gain));
       energy += amplitude;
       const barHeight = amplitude * plotHeight;
-      context.fillStyle = mixColor(
-        palette.primary,
-        index / Math.max(1, count - 1) > 0.62 ? palette.accent : palette.secondary,
-        index / Math.max(1, count - 1),
-        0.2 + amplitude * 0.46,
-      );
+      context.fillStyle = cssColor(opticalSystem.primary, 0.2 + amplitude * 0.46);
       context.fillRect(
         index * cellWidth + 1,
         baseline - barHeight,
@@ -465,9 +455,16 @@ class CanvasSpectralRenderer implements SpectralRenderer {
       );
     }
 
+    context.lineWidth = Math.max(1, width / 1200);
+    context.strokeStyle = cssColor(opticalSystem.secondary, 0.22);
+    context.beginPath();
+    context.moveTo(0, baseline);
+    context.lineTo(width, baseline);
+    context.stroke();
+
     if (energy <= 1e-5) return;
-    context.shadowColor = cssColor(palette.primary);
-    context.strokeStyle = cssColor(palette.primary, 0.86);
+    context.shadowColor = cssColor(opticalSystem.primary);
+    context.strokeStyle = cssColor(opticalSystem.primary, 0.86);
     context.lineWidth = Math.max(1.5, width / 900);
     context.beginPath();
     for (let index = 0; index < count; index += 1) {
@@ -481,26 +478,29 @@ class CanvasSpectralRenderer implements SpectralRenderer {
 
     const centroidX = frequencyBandPosition(frame, frame.spectralCentroidHz) * width;
     const rolloffX = frequencyBandPosition(frame, frame.spectralRolloffHz) * width;
-    context.lineWidth = Math.max(1, width / 1200);
-    context.strokeStyle = cssColor(palette.accent, 0.7);
+    context.lineWidth = Math.max(1.5, width / 750);
+    context.strokeStyle = cssColor(opticalSystem.primary, 0.7);
     context.beginPath();
     context.moveTo(centroidX, height * 0.06);
     context.lineTo(centroidX, baseline);
     context.stroke();
-    context.strokeStyle = cssColor(palette.secondary, 0.64);
+    context.lineWidth = Math.max(1, width / 1200);
+    context.strokeStyle = cssColor(opticalSystem.primary, 0.64);
+    context.setLineDash([Math.max(3, width / 240), Math.max(4, width / 180)]);
     context.beginPath();
     context.moveTo(rolloffX, height * 0.06);
     context.lineTo(rolloffX, baseline);
     context.stroke();
+    context.setLineDash([]);
 
-    context.fillStyle = cssColor(palette.accent, frame.highFrequencyRatio * 0.12);
+    context.fillStyle = cssColor(opticalSystem.primary, frame.highFrequencyRatio * 0.12);
     context.fillRect(width * 0.62, height * 0.06, width * 0.38, baseline - height * 0.06);
   }
 
   private drawOrbit(
     frame: FeatureFrame,
     settings: VisualSettings,
-    palette: ReturnType<typeof findPalette>,
+    opticalSystem: ReturnType<typeof findOpticalSystem>,
     width: number,
     height: number,
   ): void {
@@ -510,7 +510,13 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     const scale = Math.min(width, height);
     const innerRadius = scale * 0.07;
     const gain = visualGain(settings);
-    context.shadowColor = cssColor(palette.secondary);
+    context.shadowColor = cssColor(opticalSystem.primary);
+
+    context.beginPath();
+    context.arc(centerX, centerY, innerRadius * 0.76, 0, TAU);
+    context.strokeStyle = cssColor(opticalSystem.secondary, 0.2);
+    context.lineWidth = Math.max(1, width / 1200);
+    context.stroke();
 
     for (let pitchClass = 0; pitchClass < CHROMA_COUNT; pitchClass += 1) {
       const energy = Math.sqrt(clampUnit((frame.chroma[pitchClass] ?? 0) * gain));
@@ -522,16 +528,11 @@ class CanvasSpectralRenderer implements SpectralRenderer {
       context.arc(centerX, centerY, innerRadius, start, end);
       context.arc(centerX, centerY, radius, end, start, true);
       context.closePath();
-      context.fillStyle = mixColor(
-        palette.primary,
-        palette.accent,
-        pitchClass / (CHROMA_COUNT - 1),
-        0.22 + energy * 0.5,
-      );
+      context.fillStyle = cssColor(opticalSystem.primary, 0.22 + energy * 0.5);
       context.fill();
       context.strokeStyle = pitchClass === frame.dominantChroma
-        ? cssColor(palette.accent, frame.chromaConcentration)
-        : cssColor(palette.primary, 0.44);
+        ? cssColor(opticalSystem.primary, frame.chromaConcentration)
+        : cssColor(opticalSystem.primary, 0.44);
       context.lineWidth = pitchClass === frame.dominantChroma
         ? Math.max(2, width / 500)
         : Math.max(1, width / 1000);
@@ -541,7 +542,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     if (frame.chromaConcentration > 0) {
       context.beginPath();
       context.arc(centerX, centerY, innerRadius * 0.76, 0, TAU);
-      context.strokeStyle = cssColor(palette.secondary, 0.35 + frame.chromaConcentration * 0.5);
+      context.strokeStyle = cssColor(opticalSystem.primary, 0.35 + frame.chromaConcentration * 0.5);
       context.lineWidth = Math.max(1, frame.chromaConcentration * scale * 0.012);
       context.stroke();
     }
@@ -550,7 +551,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
   private drawTrace(
     frame: FeatureFrame,
     settings: VisualSettings,
-    palette: ReturnType<typeof findPalette>,
+    opticalSystem: ReturnType<typeof findOpticalSystem>,
     width: number,
     height: number,
   ): void {
@@ -561,9 +562,16 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     const rms = clampUnit(frame.rms * gain) * amplitudeScale;
     const peak = clampUnit(frame.peak * gain) * amplitudeScale;
 
+    context.lineWidth = Math.max(1, width / 1200);
+    context.strokeStyle = cssColor(opticalSystem.secondary, 0.2);
+    context.beginPath();
+    context.moveTo(0, center);
+    context.lineTo(width, center);
+    context.stroke();
+
     context.setLineDash([Math.max(3, width / 220), Math.max(4, width / 150)]);
     context.lineWidth = Math.max(1, width / 1200);
-    context.strokeStyle = cssColor(palette.secondary, 0.38);
+    context.strokeStyle = cssColor(opticalSystem.primary, 0.38);
     for (const offset of [-rms, rms]) {
       context.beginPath();
       context.moveTo(0, center + offset);
@@ -571,7 +579,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
       context.stroke();
     }
     context.setLineDash([]);
-    context.strokeStyle = cssColor(palette.accent, 0.3);
+    context.strokeStyle = cssColor(opticalSystem.primary, 0.3);
     for (const offset of [-peak, peak]) {
       context.beginPath();
       context.moveTo(0, center + offset);
@@ -581,8 +589,8 @@ class CanvasSpectralRenderer implements SpectralRenderer {
 
     const waveform = frame.waveform;
     if (waveform.length > 0) {
-      context.shadowColor = cssColor(palette.primary);
-      context.strokeStyle = cssColor(palette.primary, 0.92);
+      context.shadowColor = cssColor(opticalSystem.primary);
+      context.strokeStyle = cssColor(opticalSystem.primary, 0.92);
       context.lineWidth = Math.max(1.5, width / 700);
       context.beginPath();
       const last = Math.max(1, waveform.length - 1);
@@ -596,16 +604,16 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     }
 
     const crest = clampUnit((frame.crestFactor - 1) / 5);
-    context.fillStyle = cssColor(palette.accent, 0.44);
+    context.fillStyle = cssColor(opticalSystem.primary, 0.44);
     context.fillRect(0, height * (1 - crest), Math.max(4, width * 0.025), height * crest);
-    context.fillStyle = cssColor(palette.secondary, 0.58);
+    context.fillStyle = cssColor(opticalSystem.primary, 0.58);
     context.fillRect(0, height - Math.max(3, height * 0.018), width * frame.zeroCrossingRate, height);
   }
 
   private drawLattice(
     frame: FeatureFrame,
     settings: VisualSettings,
-    palette: ReturnType<typeof findPalette>,
+    opticalSystem: ReturnType<typeof findOpticalSystem>,
     width: number,
     height: number,
   ): void {
@@ -622,7 +630,13 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     const centerX = width / 2;
     const centerY = height / 2;
     const phaseRadius = Math.min(width, height) * (0.06 + phase * 0.52);
-    context.shadowColor = cssColor(palette.primary);
+    context.shadowColor = cssColor(opticalSystem.primary);
+
+    context.beginPath();
+    context.arc(centerX, centerY, Math.min(width, height) * 0.59, 0, TAU);
+    context.strokeStyle = cssColor(opticalSystem.secondary, 0.2);
+    context.lineWidth = Math.max(1, Math.min(width, height) * 0.003);
+    context.stroke();
 
     if (evidenceStrength > 0) {
       for (let row = 0; row < rows; row += 1) {
@@ -633,12 +647,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
           const ringDistance = Math.abs(distance - phaseRadius);
           const activation = clampUnit(1 - ringDistance / (cellSize * 2.4)) * evidenceStrength;
           if (activation <= 0.02) continue;
-          context.fillStyle = mixColor(
-            palette.primary,
-            palette.secondary,
-            bpm,
-            0.12 + activation * 0.58,
-          );
+          context.fillStyle = cssColor(opticalSystem.primary, 0.12 + activation * 0.58);
           context.fillRect(
             column * cellSize + 1,
             row * cellSize + 1,
@@ -652,7 +661,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     if (onset > 0) {
       context.beginPath();
       context.arc(centerX, centerY, Math.min(width, height) * (0.025 + onset * 0.12), 0, TAU);
-      context.fillStyle = cssColor(palette.accent, 0.42 + onset * 0.42);
+      context.fillStyle = cssColor(opticalSystem.primary, 0.42 + onset * 0.42);
       context.fill();
     }
 
@@ -665,7 +674,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
         -PI / 2,
         -PI / 2 + TAU * evidence,
       );
-      context.strokeStyle = cssColor(palette.secondary, 0.68);
+      context.strokeStyle = cssColor(opticalSystem.primary, 0.68);
       context.lineWidth = Math.max(2, Math.min(width, height) * 0.008);
       context.stroke();
     }
@@ -674,7 +683,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
   private drawContour(
     frame: FeatureFrame,
     settings: VisualSettings,
-    palette: ReturnType<typeof findPalette>,
+    opticalSystem: ReturnType<typeof findOpticalSystem>,
     width: number,
     height: number,
   ): void {
@@ -691,10 +700,8 @@ class CanvasSpectralRenderer implements SpectralRenderer {
         const similarity = this.similarityData[row * SIMILARITY_SIZE + column];
         if (similarity <= 0) continue;
         const contour = 1 - Math.abs((similarity * levels) % 1 - 0.5) * 2;
-        context.fillStyle = mixColor(
-          palette.primary,
-          similarity > 0.72 ? palette.accent : palette.secondary,
-          similarity,
+        context.fillStyle = cssColor(
+          opticalSystem.primary,
           0.12 + similarity * 0.6 + contour * 0.12,
         );
         context.fillRect(
@@ -706,13 +713,13 @@ class CanvasSpectralRenderer implements SpectralRenderer {
       }
     }
 
-    context.strokeStyle = cssColor(palette.secondary, 0.45);
+    context.strokeStyle = cssColor(opticalSystem.secondary, 0.45);
     context.lineWidth = Math.max(1, width / 1100);
     context.beginPath();
     context.moveTo(0, 0);
     context.lineTo(count * cellWidth, count * cellHeight);
     context.stroke();
-    context.strokeStyle = cssColor(palette.accent, frame.recurrence * 0.52);
+    context.strokeStyle = cssColor(opticalSystem.primary, frame.recurrence * 0.52);
     context.strokeRect(0, 0, count * cellWidth, count * cellHeight);
   }
 

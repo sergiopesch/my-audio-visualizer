@@ -18,7 +18,7 @@ export interface AudioCaptureSettings {
 
 export interface AudioSourceDetails {
   readonly sampleRate: number;
-  readonly channelCount: number;
+  readonly channelCount?: number;
 }
 
 export type AudioEngineStatus =
@@ -48,7 +48,7 @@ export interface UseAudioEngineResult {
   readonly liveStream: MediaStream | null;
   /** Settings the active capture track actually reports, not merely those requested. */
   readonly captureSettings: AudioCaptureSettings | null;
-  /** Decoded AudioBuffer shape for files, or reported/fallback graph shape for live capture. */
+  /** Decoded AudioBuffer shape for files, or reported graph shape for live capture. */
   readonly sourceDetails: AudioSourceDetails | null;
   readonly isLive: boolean;
   /** Web Audio's recording output. This is intentionally not HTMLMediaElement.captureStream(). */
@@ -1025,7 +1025,7 @@ export function useAudioEngine(): UseAudioEngineResult {
             : null,
           sourceDetails: {
             sampleRate: actualTrackSettings?.sampleRate ?? context.sampleRate,
-            channelCount: actualTrackSettings?.channelCount ?? audioTracks.length,
+            channelCount: actualTrackSettings?.channelCount,
           },
         });
         return true;

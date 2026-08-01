@@ -274,7 +274,7 @@ $$
 
 and the shared 35 ms attack/220 ms release envelope produces the displayed $O_t$. Spectral-flux-style functions are established onset evidence; see Juan Pablo Bello and colleagues, [“A Tutorial on Onset Detection in Music Signals”](https://doi.org/10.1109/TSA.2005.851998), and Simon Dixon, [“Onset Detection Revisited”](https://dafx.de/paper-archive/details/_kscRgr98aSFW4l-j1YJuA).
 
-An onset-strength peak is evidence of spectral change. It is not necessarily a played note, percussion hit or musical beat.
+An onset-strength peak is evidence of spectral change. It is not necessarily a played note, percussion hit or musical beat. Meinard Müller and Ching-Yu Chiu's peer-reviewed 2024 [tutorial on novelty and activation functions](https://doi.org/10.5334/tismir.202) also makes the failure modes concrete: STFT window and hop choices materially affect a novelty function; vibrato and non-stationary noise can generate spurious spectral-flux peaks; and soft, non-percussive or masked onsets can be weak or missed. AV/01 therefore displays a **spectral-change index**, not onset probability.
 
 ### Short-term periodicity candidate
 
@@ -347,6 +347,22 @@ Jonathan Foote introduced time-by-time audio similarity images in [“Visualizin
 
 AV/01 stops at the matrix. It does not apply Foote's later checkerboard novelty kernel, boundary selection, clustering or semantic labeling; see [“Automatic Audio Segmentation Using a Measure of Audio Novelty”](https://doi.org/10.1109/ICME.2000.869637). A bright off-diagonal cell means similar recent spectral shape. It does not mean “chorus,” “verse,” “motif” or even the same sound source.
 
+## Visual encoding contract
+
+The feature equations above are only half of the claim. This table states how those values become pixels in both the WebGL and Canvas 2D renderers.
+
+| Scene | Position and geometry | Value encoding | Reference encoding |
+| --- | --- | --- | --- |
+| Auditory Field | Horizontal position follows the 24 ERB-rate-spaced band order; vertical extent is the square root of band magnitude after visual sensitivity | Electric-blue area and opacity increase with band magnitude; blue centroid and 85% rolloff markers use different line forms; the high-frequency region remains a blue signal overlay | A thin white baseline is fixed reference geometry |
+| Tonal Orbit | Angle is one of twelve fixed 12-TET pitch classes with C at twelve o'clock; radius is the square root of class energy | Electric-blue sector extent and opacity increase with class energy; blue line weight identifies the strongest class and follows the concentration index | A thin white inner ring is fixed reference geometry |
+| Temporal Scope | Horizontal position traverses the current 4096-sample window; vertical position is the block-mean mono sample | The electric-blue trace follows signed sample amplitude; blue dashed RMS rails, thinner peak rails and geometric crest/ZCR gauges remain distinct by line form | A thin white centreline marks zero amplitude |
+| Rhythm Lattice | Grid density follows the 50–200 BPM-equivalent candidate; ring radius follows candidate phase | Electric-blue lattice visibility follows the heuristic periodicity index; the blue core follows spectral change and the blue arc follows available history | A thin white outer ring is the history reference track |
+| Recurrence Atlas | Both axes are recent time on the same 64-snapshot order | Electric-blue lightness/opacity follows non-negative cosine similarity; a blue frontier marks populated history | The white identity diagonal is fixed reference structure inside the populated matrix |
+
+Black `#000000` means zero or absence, electric blue `#008CFF` means signal-derived evidence, and white `#FFFFFF` means reference geometry or annotation. Tints are opacity blends of those three source pigments only. Frequency position, pitch class, BPM and matrix coordinates do **not** drive hue. This avoids creating a visual variable the audio transform never computed.
+
+Sensitivity, intensity, glow, detail and highlight compression alter presentation only. Square-root magnitude, opacity, line weight, contour quantization and post-render highlight compression mean screenshot pixels are not calibrated measurements; the labeled numerical readouts are the evidence layer. The optical choices are informed by current work on [colour integrity in scientific visualization](https://doi.org/10.1016/j.patter.2024.100972), [accessible continuous colour maps](https://doi.org/10.1145/3613904.3642265), [motion as quantitative visual encoding](https://doi.org/10.1109/TVCG.2022.3193756) and [WCAG 2.2 non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html). Those sources guide presentation; they do not validate AV/01's audio analysis or prove that viewers interpret these scenes accurately.
+
 ## Current implementation constants
 
 | Quantity | Current value | Meaning and boundary |
@@ -405,10 +421,10 @@ The following statuses summarize the recorded [release-candidate evidence](VALID
 
 | Gate ID | Gate | What a pass would establish | Status |
 | --- | --- | --- | --- |
-| `AV01-VAL-001` | Deterministic unit fixtures | ERB transforms, pitch-class folding, entropy, periodicity and similarity match controlled numerical expectations | Pass · 34/34 tests |
+| `AV01-VAL-001` | Deterministic unit fixtures | ERB transforms, pitch-class folding, entropy, periodicity and similarity match controlled numerical expectations | Pass · 38/38 tests, including optical-system and scalar tone-mapping enforcement |
 | `AV01-VAL-002` | Signal-family fixtures | Browser sines, silent intervals, octave pairs, transient trains and repeated spectral shapes—plus unit-level impulse and silence controls—drive the intended descriptors without NaN/Infinity | Pass · nine deterministic browser fixtures plus unit controls |
 | `AV01-VAL-003` | Scene-contract routing | Each scene consumes its declared primary representation and exposes the stated limitation | Pass · WebGL isolation tests plus optimized-browser Canvas fallback signal gates |
-| `AV01-VAL-004` | Browser integration | The tested path reports coherent sample rate, FFT size, source provenance and renderer state | Partial · 3/3 Chromium end-to-end gates plus recorded Canvas 2D and WebGL 2 local-file paths pass; live capture not exercised |
+| `AV01-VAL-004` | Browser integration | The tested path reports coherent sample rate, FFT size, source provenance and renderer state | Partial · 4/4 Chromium end-to-end gates plus recorded Canvas 2D and WebGL 2 local-file paths pass; live capture not exercised |
 | `AV01-VAL-005` | Reset/seek/source lifecycle | Stateful rhythm and similarity history reset instead of leaking across discontinuities or sources | Pass · source, stop, replay and export restoration |
 | `AV01-VAL-006` | Export provenance | Preview and recording use the same measured feature frames and scene contract | Pass · full 1280 × 720 WebGL WebM render |
 | `AV01-VAL-007` | Long-session timing | Nominal feature cadence, hidden-tab behavior and bounded resume steps remain coherent under load | Not completed for this candidate |
@@ -436,11 +452,16 @@ These stable IDs are used by the scene definitions and this document.
 
 Additional primary papers and official standards used to define boundaries:
 
+- Meinard Müller and Ching-Yu Chiu, “A Basic Tutorial on Novelty and Activation Functions for Music Signal Processing,” *Transactions of the International Society for Music Information Retrieval* 7(1), 179–194, 2024. [DOI 10.5334/tismir.202](https://doi.org/10.5334/tismir.202).
 - Jonathan T. Foote and Matthew L. Cooper, “Media Segmentation Using Self-Similarity Decomposition,” *Proceedings of SPIE* 5021, 167–175, 2003. [DOI 10.1117/12.476302](https://doi.org/10.1117/12.476302).
 - Daniel P. W. Ellis, “Beat Tracking by Dynamic Programming,” *Journal of New Music Research* 36(1), 51–60, 2007. [DOI 10.1080/09298210701653344](https://doi.org/10.1080/09298210701653344).
 - Peter Grosche and Meinard Müller, “Extracting Predominant Local Pulse Information from Music Recordings,” *IEEE Transactions on Audio, Speech, and Language Processing* 19(6), 1688–1701, 2011. [DOI 10.1109/TASL.2010.2096216](https://doi.org/10.1109/TASL.2010.2096216).
 - Charalampos Saitis and Kai Siedenburg, “Brightness Perception for Musical Instrument Sounds: Relation to Timbre Dissimilarity and Source-Cause Categories,” *Journal of the Acoustical Society of America* 148(4), 2256–2266, 2020. [DOI 10.1121/10.0002275](https://doi.org/10.1121/10.0002275).
+- Fabio Crameri and Sari Hason, “Navigating Color Integrity in Data Visualization,” *Patterns* 5(5), 100972, 2024. [DOI 10.1016/j.patter.2024.100972](https://doi.org/10.1016/j.patter.2024.100972).
+- Amey Salvi, Kecheng Lu, Michael E. Papka, Yunhai Wang and Khairi Reda, “Color Maker: A Mixed-Initiative Approach to Creating Accessible Color Maps,” *CHI Conference on Human Factors in Computing Systems*, 1–17, 2024. [DOI 10.1145/3613904.3642265](https://doi.org/10.1145/3613904.3642265).
+- Shaghayegh Esmaeili, Samia Kabir, Anthony M. Colas, Rhema P. Linder and Eric D. Ragan, “Evaluating Graphical Perception of Visual Motion for Quantitative Data Encoding,” *IEEE Transactions on Visualization and Computer Graphics* 29(12), 4845–4857, 2023. [DOI 10.1109/TVCG.2022.3193756](https://doi.org/10.1109/TVCG.2022.3193756).
 - [W3C Media Capture and Streams](https://www.w3.org/TR/mediacapture-streams/), current specification.
+- [W3C Web Content Accessibility Guidelines 2.2](https://www.w3.org/TR/WCAG22/) and its guidance for [use of colour](https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html), [non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html) and [three flashes](https://www.w3.org/WAI/WCAG22/Understanding/three-flashes.html).
 - [WHATWG HTML Standard: event loops and rendering opportunities](https://html.spec.whatwg.org/multipage/webappapis.html), living standard.
 - [ITU-R BS.1770-5](https://www.itu.int/rec/R-REC-BS.1770-5-202311-I), “Algorithms to Measure Audio Programme Loudness and True-Peak Audio Level,” November 2023.
 - [EBU R 128, version 5.0](https://tech.ebu.ch/publications/r128), “Loudness Normalisation and Permitted Maximum Level of Audio Signals,” November 2023.

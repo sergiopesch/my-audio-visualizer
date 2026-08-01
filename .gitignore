@@ -16,7 +16,7 @@
 /output/*
 !/output/playwright/
 /output/playwright/*
-!/output/playwright/av01-studio-readme.jpg
+!/output/playwright/av01-studio-readme.png
 
 # Next.js
 /.next/

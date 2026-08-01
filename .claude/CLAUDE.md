@@ -1,139 +1,67 @@
-# Project Instructions
+# Project instructions
 
 ## Mission
 
-Build and maintain a real-time audio visualizer web application. Users can capture system audio or upload files to see a radial ripple visualization, with adjustable settings and WebM video export.
+Build AV/01 as a local-first audio experiment: five real-time visual representations of five declared signal transforms. The interface must show what the browser actually computes, state what each view cannot infer, and never turn presentation into an unsupported scientific claim.
 
-## Principles
+## Non-negotiable contracts
 
-- Keep the codebase simple and self-contained
-- Prioritize browser performance and compatibility
-- No unnecessary dependencies or abstractions
-- Every change must be testable in a browser
+- Every scene owns one declared feature family. Do not reuse an audio feature in another scene merely to make it move.
+- No autonomous animation clocks, procedural noise, random grain or decorative motion in measured scenes.
+- Keep synthetic preview data explicitly labeled `ILLUSTRATIVE · NOT MEASURED`.
+- Percentages are only for real fractions. Heuristic scores, concentration and cosine similarity are unitless indices, never probability or confidence.
+- Visual settings alter presentation only. They do not change the underlying analysis and the pixels are not metrological output.
+- Keep limitations and provenance visible in the product and complete in `docs/SCIENCE.md`.
+
+## Optical system
+
+Use exactly three source pigments:
+
+- black `#000000` for silence, absence and the stage;
+- electric blue `#008CFF` for signal-derived evidence and interaction;
+- white `#FFFFFF` for reference geometry, labels and structure.
+
+Tonal hierarchy may use opacity blends of those three only. Do not add alternate palettes, semantic red, rainbow ramps or coordinate-driven hue. State changes must also use text, icons, geometry or line form so colour is never the only cue.
 
 ## Architecture
 
-```
-src/app/
-  page.tsx        # Main client component (all logic: audio, canvas, UI)
-  layout.tsx      # Root layout with metadata
-  globals.css     # Design system: CSS variables, glass effects, animations, custom inputs
-server.js         # Custom HTTPS server (required for getDisplayMedia and MediaRecorder)
-```
-
-Single-page architecture: all application logic lives in `src/app/page.tsx`.
-
-### Key technologies
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript 5
-- **UI**: React 19, Tailwind CSS 3.4
-- **Browser APIs**: Web Audio API, Canvas API, MediaRecorder API, Screen Capture API
-
-### Audio pipeline (dual-source)
-
-**System audio:**
-```
-getDisplayMedia({ audio: true }) -> MediaStream -> MediaStreamSource -> AnalyserNode -> Canvas
+```text
+src/app/                         Next.js shell, metadata and design system
+src/components/studio/           source, scene, stage, inspector, transport and export UI
+src/hooks/                       Web Audio lifecycle and MediaRecorder lifecycle
+src/lib/audio/                   fixed feature bus and scientific transforms
+src/lib/visualizer/              scene contracts, WebGL shader and Canvas fallback
+tests/e2e/                       optimized-browser signal experiments
+docs/SCIENCE.md                  methods, formulas, sources and limits
+docs/VALIDATION.md               recorded internal release evidence
+docs/history/                    preserved project history
 ```
 
-**File upload:**
-```
-<audio> element -> MediaElementSource -> AnalyserNode -> destination -> Canvas
-```
-
-Both sources connect to the same `AnalyserNode`. System audio does not route to destination (avoids echo).
-
-### Visualization
-- Dynamic grid: cols/rows computed from `canvasWidth / pixelSize`
-- Dark canvas background (`#09090b`) with 1px gaps between cells
-- Blue-cyan HSL gradient: hue 200-220, bright center to deep edges
-- Sensitivity multiplier scales the amplitude threshold
-- Subtle random flicker for organic feel
-
-### UI design system (`globals.css`)
-- Pure black (`#000`) base with CSS custom properties
-- `.glass` class: glassmorphism with `backdrop-filter: blur(12px)`
-- `.canvas-glow` / `.canvas-glow.active`: ambient glow around canvas
-- Custom range slider styling with glowing blue thumb
-- `.animate-fade-in`: entry animation for views
-- `.live-dot`: pulse-glow animation for system audio indicator
-
-## Constraints
-
-- **HTTPS required**: Both `getDisplayMedia` and `MediaRecorder` require secure context
-- **No external UI libraries**: Tailwind CSS + custom CSS only
-- **No state management libraries**: React hooks only
-- **Single-component architecture**: All logic in `page.tsx` unless complexity demands splitting
-- **Browser support**: Chrome/Edge 80+, Firefox 76+, Safari 14+
+The analysis clock is separate from the render clock. WebGL 2 is preferred and Canvas 2D is the fallback; both must preserve the same scene meaning. Audio stays on-device.
 
 ## Engineering standards
 
-- Small, focused changes
-- Clear, readable code over clever code
-- No unnecessary abstractions for one-time operations
-- Test with various audio files and formats after changes
-- Verify both system audio and file upload modes after changes
+- Prefer small, explicit changes and zero-allocation render paths.
+- Never crop a measured frame; preview and export must show the same full analysis canvas.
+- Do not mutate DOM telemetry or read layout on every animation frame.
+- Preserve browser-resource cleanup for tracks, nodes, contexts, timers, listeners and object URLs.
+- Keep native keyboard behavior. Custom radiogroups must support roving focus, arrow keys, Home and End.
+- Honour reduced motion, increased contrast, reduced transparency and forced colours.
+- Preserve history instead of rewriting old artefacts to look current.
 
-## Workflow
-
-1. Understand the task fully before writing code
-2. Read the relevant source files
-3. Plan the minimal change needed
-4. Implement the change
-5. Validate with `npm run build` and `npm run lint`
-
-## Testing
-
-Required checks before considering work complete:
+## Required validation
 
 ```bash
-npm run lint    # No ESLint errors
-npm run build   # Production build succeeds
+npm run type-check
+npm run lint -- --max-warnings=0
+npm test
+npm run science:fixtures:check
+npm run audit:ci
+npm run test:e2e
 ```
 
-### Manual verification checklist
-- System audio capture works (with "Share audio" enabled)
-- Audio drag-and-drop works
-- File input selection works
-- Play/Pause/Stop controls function (file mode)
-- Timeline scrubbing works (file mode)
-- Visualization renders during playback (both modes)
-- Settings panel: sensitivity and pixel size adjust in real-time
-- Export to WebM completes (file mode)
-- Cancel export works during recording
-- Back button returns to source picker and cleans up resources
+Also inspect a real WebGL render and the Canvas fallback at desktop and mobile widths, exercise keyboard controls, verify there is no horizontal overflow, and compare the implementation against the committed optical and scientific contracts.
 
 ## Documentation
 
-- README.md must reflect actual current functionality
-- No aspirational features or roadmap items in docs
-- Keep inline comments minimal; only where logic is non-obvious
-
-## Permissions philosophy
-
-- Least privilege for auto-mode
-- Never expose SSL certificates or secrets
-- No destructive filesystem or git operations without confirmation
-
-## Auto mode rules
-
-- Allow: read, write, edit, glob, grep, npm scripts, git read commands
-- Deny: sudo, rm -rf, secret file access, piped curl/wget execution
-- Prefer constrained autonomy over full shell access
-
-## Anti-goals
-
-- Do NOT turn this into a multi-page application without explicit request
-- Do NOT add external state management (Redux, Zustand, etc.)
-- Do NOT add a backend API or database
-- Do NOT add authentication or user accounts
-- Do NOT over-engineer the single-file architecture prematurely
-
-## Definition of done
-
-- Code works in the browser
-- `npm run build` passes
-- `npm run lint` passes
-- Manual testing checklist verified
-- No regressions to existing features
-- README updated if user-facing behavior changed
+README and current documentation must describe what ships, in plain and direct language. Keep aspirations in an explicitly labeled roadmap. Do not claim peer review, perceptual validation, calibrated measurement, statistical independence or external scientific approval unless that work has actually happened.

@@ -93,7 +93,7 @@ source → Web Audio graph → feature bus → scene renderer → canvas
                                              canvas → export video
 ```
 
-For an active user source, the same audio graph, feature frame, scene, palette, settings and playback clock now drive what the user sees and exports. The landing state is a separately labeled deterministic synthetic preview; it is never presented as captured audio or used to replace a missing live signal.
+For an active user source, the same audio graph, feature frame, scene, fixed optical system, settings and playback clock now drive what the user sees and exports. The landing state is a separately labeled deterministic synthetic preview; it is never presented as captured audio or used to replace a missing live signal.
 
 That sounds obvious, but neither earlier project handled it completely.
 
@@ -121,7 +121,7 @@ A short-time spectrum grouped into 24 ERB-rate-spaced triangular regions. It sho
 
 ### Tonal Orbit · `AV01-SCI-002`
 
-Twelve octave-folded pitch-class energy bins become fixed sectors. It shows concentration under the chosen mapping; it does not identify a note, octave, chord, key or tuning.
+Twelve octave-folded pitch-class energy bins become fixed sectors. It shows a unitless concentration index under the chosen mapping; it does not identify a note, octave, chord, key or tuning.
 
 ### Temporal Scope · `AV01-SCI-003`
 
@@ -129,13 +129,19 @@ The recent mono waveform becomes the form, with RMS, sample peak, crest factor a
 
 ### Rhythm Lattice · `AV01-SCI-004`
 
-Onset-strength evidence excites the original lattice idea, while short-term autocorrelation offers a periodicity candidate, a heuristic evidence score and the history duration. The score is not a probability or calibrated confidence. The scene does not confirm a beat, tempo, downbeat, meter or groove.
+Spectral-change evidence excites the original lattice idea, while short-term autocorrelation offers a periodicity candidate, a heuristic index and the history duration. The index is not a probability or calibrated confidence. The scene does not confirm a beat, tempo, downbeat, meter or groove.
 
 ### Recurrence Atlas · `AV01-SCI-005`
 
 Recent spectral shape becomes a rolling time-by-time cosine self-similarity matrix. A bright off-diagonal cell means resemblance inside the current eight-second history; it does not label a chorus, verse, motif, source or structural boundary.
 
-Scenes are independent from sensitivity, intensity, glow, detail, palette, frame and visual-comfort settings. The system is composable instead of being a collection of locked presets.
+Scenes can be paired with sensitivity, intensity, glow, detail, frame and visual-comfort settings without changing the underlying analysis. The system is composable instead of being a collection of locked presets.
+
+## The optical system
+
+I have now removed the four interchangeable palettes. They made the instrument look flexible, but they also let arbitrary hue imply an audio dimension the analysis never computed.
+
+AV/01 now uses one authored language: black for silence and the stage, electric blue for signal-derived evidence, and white for references, thresholds and words. Opacity, extent, weight and line form carry magnitude and state. Colour supports the reading; it does not invent one.
 
 ## The scientific contract
 
@@ -148,6 +154,7 @@ Those sources establish precedents for the signal representations. They do not e
 The AV/01 rebuild now includes:
 
 - A WebGL 2 shader pipeline with a distinct Canvas 2D fallback.
+- One enforceable black, white and electric-blue optical system shared by interface, WebGL, Canvas and export.
 - Allocation-stable audio feature extraction, a nominal 50 Hz analysis clock decoupled from display refresh and explicit state reset across source discontinuities.
 - Signal-derived scene state without an extra autonomous animation clock.
 - Media-playhead transport/export coordination, with analysis history reset across seek, source change, stop and replay-from-end.
@@ -157,7 +164,8 @@ The AV/01 rebuild now includes:
 - Browser-aware recording format negotiation.
 - Recorder timeslices, automatic file completion and manual live completion.
 - Playback restoration, background-tab coordination and explicit time/memory ceilings.
-- An explicit demo pause, reduced-motion behavior, semantic controls, focus states and dialog semantics.
+- An explicit demo pause, reduced-motion, increased-contrast and reduced-transparency behavior, semantic controls, focus states and dialog semantics.
+- Full-frame measured canvases that are contained rather than cropped at desktop and mobile sizes.
 - Responsive desktop, mobile and short-landscape layouts.
 - Standard clean-clone development and production commands.
 

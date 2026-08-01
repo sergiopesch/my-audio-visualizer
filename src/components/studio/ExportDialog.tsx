@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { RecorderStatus } from "@/hooks/useCanvasRecorder";
 import { ASPECTS, type AspectId } from "@/lib/visualizer/types";
 import { Icon } from "./Icons";
@@ -69,8 +69,39 @@ export function ExportDialog({
   onClose,
 }: ExportDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const aspectButtonsRef = useRef<Array<HTMLButtonElement | null>>([]);
   const recording = status === "preparing" || status === "recording";
   const fileMode = sourceMode === "file";
+
+  const handleAspectKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    let nextIndex: number;
+
+    switch (event.key) {
+      case "ArrowLeft":
+      case "ArrowUp":
+        nextIndex = (index - 1 + ASPECTS.length) % ASPECTS.length;
+        break;
+      case "ArrowRight":
+      case "ArrowDown":
+        nextIndex = (index + 1) % ASPECTS.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = ASPECTS.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    onAspectChange(ASPECTS[nextIndex].id);
+    aspectButtonsRef.current[nextIndex]?.focus();
+  };
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -113,7 +144,7 @@ export function ExportDialog({
             <Icon name="check" size={30} />
           </span>
           <h3>Your visual is ready.</h3>
-          <p>The recording uses the same scene, palette and audio graph as the live stage.</p>
+          <p>The recording uses the same scene, fixed optical system and audio graph as the live stage.</p>
           {notice ? <p className="export-completion-notice" role="status">{notice}</p> : null}
           <a className="export-download-link" href={downloadUrl} download={downloadName(fileName, extension)}>
             <Icon name="download" />
@@ -129,14 +160,19 @@ export function ExportDialog({
             <section className="export-format-section" aria-labelledby="export-format-title">
               <h3 id="export-format-title">01 / FRAME</h3>
               <div className="export-aspect-grid" role="radiogroup" aria-label="Export aspect ratio">
-                {ASPECTS.map((option) => (
+                {ASPECTS.map((option, index) => (
                   <button
                     key={option.id}
+                    ref={(button) => {
+                      aspectButtonsRef.current[index] = button;
+                    }}
                     type="button"
                     role="radio"
                     aria-checked={aspect === option.id}
+                    tabIndex={aspect === option.id ? 0 : -1}
                     className={aspect === option.id ? "is-active" : ""}
                     onClick={() => onAspectChange(option.id)}
+                    onKeyDown={(event) => handleAspectKeyDown(event, index)}
                     disabled={recording}
                   >
                     <i className={`aspect-icon aspect-${option.id}`} aria-hidden="true" />
@@ -173,7 +209,14 @@ export function ExportDialog({
                   <strong>{status === "preparing" ? "PREPARING" : "RECORDING"}</strong>
                   <time>{formatElapsed(elapsed)}</time>
                 </div>
-                <div className="progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={fileMode ? Math.round(progress * 100) : undefined}>
+                <div
+                  className="progress-track"
+                  role="progressbar"
+                  aria-label={fileMode ? "Track render progress" : "Live capture progress"}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={fileMode ? Math.round(progress * 100) : undefined}
+                >
                   <i style={{ width: fileMode ? `${progress * 100}%` : "38%" }} />
                 </div>
                 <p>{fileMode ? `${Math.round(progress * 100)}% of track rendered` : "Live capture in progress"}</p>

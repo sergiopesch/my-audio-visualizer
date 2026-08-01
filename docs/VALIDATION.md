@@ -10,12 +10,19 @@ Recorded environment: macOS 26.6 (`arm64`), Codex in-app browser runtime (browse
 
 ## Automated evidence
 
-The release suite currently contains 34 deterministic tests across three unit-test files, plus three Chromium end-to-end tests:
+The release suite currently contains 38 deterministic tests across four unit-test files, plus four Chromium end-to-end tests:
 
 - 14 feature-bus tests for ERB layout, equal-RMS spectral separation, waveform descriptors, over-full-scale samples, polarity, chroma, tone-to-silence clearing, onset response, production-smoothed 120/200 BPM-equivalent periodicity, sustained-spectrum rejection, state identity and reset;
 - 16 scientific-analysis tests for ERB transforms, pitch-class folding, entropy, production-smoothed 90/120/180/200 BPM-equivalent periodicity, an aperiodic control, constant and sub-threshold envelope rejection, one-shot transient hysteresis and rolling recurrence;
 - 4 scene-contract tests for non-overlapping feature ownership, visible limitations, WebGL evidence isolation and the absence of autonomous clocks, noise and grain.
-- 3 Chromium end-to-end tests for hydration/provenance/mobile overflow, the sustained-tone negative control, all five scene routes, stop/reset and the periodic-versus-jittered transient control.
+- 4 optical-system tests that enforce the exact black, `#008CFF` and white source pigments, reject undeclared colour literals and hue-shifting brightness filters, require scalar shader tone mapping, and verify the required foreground/background contrast pairs;
+- 4 Chromium end-to-end tests for hydration/provenance/mobile overflow, native radiogroup keyboard behavior, measured-frame containment and ordering, the sustained-tone negative control, all five scene routes, stop/reset and the periodic-versus-jittered transient control.
+
+## Current optical and interface regression pass
+
+The fixed optical system is now part of the executable contract rather than a style-guide promise. A recursive test rejects any hexadecimal or RGB colour source outside black, electric blue and white; quieter tones must be alpha or `color-mix()` derivatives of those pigments. Shader highlight compression now operates on one scalar intensity before multiplying the preserved pigment ratio, and CSS brightness filters are prohibited. Rendered-pixel gates inspect both WebGL 2 and Canvas 2D output against the black/electric-blue/white mixture gamut; the reproducible README capture repeats the same check on a populated Recurrence Atlas before writing a lossless PNG. The landing journey also verifies the computed `#008CFF` action surface with black text.
+
+The measured interface was repeated in the Codex in-app browser at 1280 × 720 and 390 × 844. The desktop grid reported an 848 px stage and 294 px inspector with no document overflow. The mobile pass reported no horizontal overflow, transport before inspector, `object-fit: contain`, a 9:16 displayed ratio of `0.5625` against an intrinsic ratio of `0.5628`, and successful arrow-key scene changes. The browser console contained no warnings or errors. These checks approve the recorded layouts and interactions; they are not a substitute for the still-open cross-browser and assistive-technology matrix.
 
 The landing journey keeps the browser's default renderer path. The two fixed-duration signal journeys deliberately select AV/01's production Canvas 2D fallback before navigation. That prevents a CI runner's software-WebGL throughput from shortening the evidence history while leaving the WAV fixture, `AnalyserNode`, analysis timer, feature bus and every scientific threshold unchanged.
 
@@ -55,7 +62,7 @@ The browser run exercised the real file decode, `AnalyserNode`, feature clock, s
 | Auditory Field | 375 Hz and 6 kHz sine waves with equal generated RMS | Levels `-12.033` and `-12.041` dBFS; centroids `375` and `6000` Hz; >3 kHz power `0%` and `100%` | Pass: level is held while spectral position changes |
 | Tonal Orbit | A3 at 220 Hz and A4 at 440 Hz | Both report strongest class `A`; concentrations about `54.5%` and `73.2%`; levels differ by about `0.002` dB | Pass: octave folds while the display avoids note/octave inference |
 | Temporal Scope | 375 Hz reference and polarity-inverted copy | Reference/inverted: level `-12.041`/`-12.030` dBFS, peak `0.3536`/`0.3536`, ZCR `0.0171`/`0.0171`, crest `1.4168`/`1.4265`; the numerical unit fixture verifies every displayed waveform point changes sign | Pass: waveform polarity changes while magnitude descriptors remain invariant within browser-window tolerance |
-| Rhythm Lattice | 15 periodic pulses at 120 BPM-equivalent and 15 jittered pulses | Four fresh Chromium runs: periodic candidate `119.65`–`120.06`, evidence `0.8774`–`0.9221`, 13 retained candidates; matched aperiodic evidence `0.2714`–`0.3534` at the same analysis-history point | Pass: repeated onset timing separates from the matched event-count control; the value remains a candidate and the score is not probability |
+| Rhythm Lattice | 15 periodic pulses at 120 BPM-equivalent and 15 jittered pulses | Seven fresh Chromium runs: periodic candidate `119.57`–`120.06`, evidence `0.8136`–`0.9475`, 13–15 retained candidates; matched aperiodic evidence `0.2694`–`0.3534` at the same analysis-history point | Pass: repeated onset timing separates from the matched event-count control; the value remains a candidate and the score is not probability |
 | Recurrence Atlas | level-changed A–B–A sequence and A–B–C control | At the repeated A, recurrence `1.000`; at C, recurrence `0.000`; both final reads used WebGL 2 with 43 populated matrix samples | Pass: level-normalized repeated spectral shape separates from a non-repeating control |
 
 ### The failed control I kept in the story
@@ -86,8 +93,8 @@ The committed regression matrix now covers production smoothing at 90, 120, 180 
 
 | Gate | Status on this candidate | Evidence boundary |
 | --- | --- | --- |
-| `AV01-VAL-001` deterministic numerical fixtures | **Pass** | 34/34 unit tests, including production-smoothed 90/120/180/200 BPM-equivalent cases, transient-gate adversarial controls and tone-to-silence clearing |
-| `AV01-VAL-002` signal-family fixtures | **Pass** | Nine reproducible WAV fixtures, hash verification and 3/3 optimized Chromium end-to-end gates |
+| `AV01-VAL-001` deterministic numerical fixtures | **Pass** | 38/38 unit tests, including production-smoothed 90/120/180/200 BPM-equivalent cases, transient-gate adversarial controls, tone-to-silence clearing and fixed-optical-system enforcement |
+| `AV01-VAL-002` signal-family fixtures | **Pass** | Nine reproducible WAV fixtures, hash verification and 4/4 optimized Chromium end-to-end gates |
 | `AV01-VAL-003` scene-contract routing | **Pass** | Non-overlapping feature declarations and WebGL block-isolation tests; Canvas routing exercised by optimized-browser signal gates against the same contract |
 | `AV01-VAL-004` browser integration | **Partial** | Local-file provenance, decoded rate, FFT/window disclosure, Canvas 2D and WebGL 2 passed in the recorded browser; system capture and microphone permission/settings were not exercised |
 | `AV01-VAL-005` reset/seek/source lifecycle | **Pass** | Reset unit tests plus source, stop, replay-from-end and export restoration checks |

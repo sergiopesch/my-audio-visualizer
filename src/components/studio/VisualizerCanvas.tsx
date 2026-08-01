@@ -73,6 +73,12 @@ interface CanvasRuntime {
   setActive: (active: boolean) => void;
 }
 
+interface PreviewDimensions {
+  cssWidth: number;
+  cssHeight: number;
+  pixelRatio: number;
+}
+
 function nowMilliseconds(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
 }
@@ -95,20 +101,22 @@ function syncBackingDimensions(
   canvas: HTMLCanvasElement,
   settings: VisualSettings,
   outputMode: "preview" | "export",
+  previewDimensions: PreviewDimensions,
 ): void {
   const aspect = findAspect(settings.aspect);
   let width = aspect.width;
   let height = aspect.height;
 
   if (outputMode === "preview") {
-    const bounds = canvas.getBoundingClientRect();
-    const cssWidth = bounds.width || aspect.width;
-    const cssHeight = bounds.height || aspect.height;
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+    const cssWidth = previewDimensions.cssWidth || aspect.width;
+    const cssHeight = previewDimensions.cssHeight || aspect.height;
     const fitScale = settings.aspect === "landscape"
       ? cssWidth / aspect.width
       : Math.min(cssWidth / aspect.width, cssHeight / aspect.height);
-    const scale = Math.min(1, Math.max(0.25, fitScale * pixelRatio));
+    const scale = Math.min(
+      1,
+      Math.max(0.25, fitScale * previewDimensions.pixelRatio),
+    );
     width = Math.max(2, Math.round(aspect.width * scale));
     height = Math.max(2, Math.round(aspect.height * scale));
   }
@@ -205,8 +213,60 @@ export function VisualizerCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    syncBackingDimensions(
-      canvas,
+    const initialAspect = findAspect(effectiveSettingsRef.current.aspect);
+    const initialBounds = canvas.getBoundingClientRect();
+    let previewDimensions: PreviewDimensions = {
+      cssWidth: initialBounds.width || initialAspect.width,
+      cssHeight: initialBounds.height || initialAspect.height,
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+    };
+    let previewDimensionRevision = 0;
+    let lastBackingAspect: VisualSettings["aspect"] | null = null;
+    let lastBackingOutputMode: "preview" | "export" | null = null;
+    let lastBackingPreviewRevision = -1;
+
+    const syncBackingDimensionsIfNeeded = (
+      currentSettings: VisualSettings,
+      currentOutputMode: "preview" | "export",
+    ) => {
+      if (
+        currentSettings.aspect === lastBackingAspect &&
+        currentOutputMode === lastBackingOutputMode &&
+        previewDimensionRevision === lastBackingPreviewRevision
+      ) {
+        return;
+      }
+
+      syncBackingDimensions(
+        canvas,
+        currentSettings,
+        currentOutputMode,
+        previewDimensions,
+      );
+      lastBackingAspect = currentSettings.aspect;
+      lastBackingOutputMode = currentOutputMode;
+      lastBackingPreviewRevision = previewDimensionRevision;
+    };
+
+    const updatePreviewDimensions = (
+      cssWidth: number,
+      cssHeight: number,
+      pixelRatio: number,
+    ): boolean => {
+      if (
+        previewDimensions.cssWidth === cssWidth &&
+        previewDimensions.cssHeight === cssHeight &&
+        previewDimensions.pixelRatio === pixelRatio
+      ) {
+        return false;
+      }
+
+      previewDimensions = { cssWidth, cssHeight, pixelRatio };
+      previewDimensionRevision += 1;
+      return true;
+    };
+
+    syncBackingDimensionsIfNeeded(
       effectiveSettingsRef.current,
       outputModeSignal?.current ?? outputModeRef.current,
     );
@@ -265,11 +325,38 @@ export function VisualizerCanvas({
       return lastPlaybackTimeSeconds;
     };
 
-    const emitTelemetry = (frame: FeatureFrame, timestampMs: number) => {
+    const publishFrameData = (
+      frame: FeatureFrame,
+      currentSettings: VisualSettings,
+      currentOutputMode: "preview" | "export",
+    ) => {
+      canvas.dataset.outputMode = currentOutputMode;
+      canvas.dataset.analysisSource = mode === "demo"
+        ? "synthetic-preview"
+        : "measured";
+      canvas.dataset.analysisSequence = String(frame.sequence);
+      canvas.dataset.scene = currentSettings.scene;
+      canvas.dataset.levelDbFs = frame.levelDbFs.toFixed(3);
+      canvas.dataset.peakLinear = frame.peak.toFixed(4);
+      canvas.dataset.crestFactor = frame.crestFactor.toFixed(4);
+      canvas.dataset.zeroCrossingRate = frame.zeroCrossingRate.toFixed(4);
+      canvas.dataset.centroidHz = frame.spectralCentroidHz.toFixed(2);
+      canvas.dataset.rolloffHz = frame.spectralRolloffHz.toFixed(2);
+      canvas.dataset.highFrequencyRatio = frame.highFrequencyRatio.toFixed(4);
+      canvas.dataset.onsetStrength = frame.onsetStrength.toFixed(4);
+      canvas.dataset.periodicityBpm = frame.periodicityBpm.toFixed(2);
+      canvas.dataset.periodicityEvidence = frame.periodicityEvidence.toFixed(4);
+      canvas.dataset.transientCandidateCount = String(frame.transientCandidateCount);
+      canvas.dataset.chromaConcentration = frame.chromaConcentration.toFixed(4);
+      canvas.dataset.dominantChroma = String(frame.dominantChroma);
+      canvas.dataset.recurrence = frame.recurrence.toFixed(4);
+      canvas.dataset.similarityCount = String(frame.selfSimilarityCount);
+    };
+
+    const emitTelemetry = (frame: FeatureFrame) => {
       const callback = telemetryCallbackRef.current;
       if (!callback) return;
 
-      lastTelemetryTimestampMs = timestampMs;
       const energy = frame.rms;
       try {
         callback({
@@ -303,7 +390,12 @@ export function VisualizerCanvas({
       }
     };
 
-    const reportAnimatedFrame = (frame: FeatureFrame, timestampMs: number) => {
+    const reportAnimatedFrame = (
+      frame: FeatureFrame,
+      currentSettings: VisualSettings,
+      currentOutputMode: "preview" | "export",
+      timestampMs: number,
+    ) => {
       telemetryWindowFrames += 1;
       if (timestampMs - lastTelemetryTimestampMs < TELEMETRY_INTERVAL_MS) return;
 
@@ -316,12 +408,23 @@ export function VisualizerCanvas({
       }
       telemetryWindowStartedMs = timestampMs;
       telemetryWindowFrames = 0;
-      emitTelemetry(frame, timestampMs);
+      publishFrameData(frame, currentSettings, currentOutputMode);
+      lastTelemetryTimestampMs = timestampMs;
+      emitTelemetry(frame);
     };
 
-    const reportStillFrame = (frame: FeatureFrame, timestampMs: number) => {
+    const reportStillFrame = (
+      frame: FeatureFrame,
+      currentSettings: VisualSettings,
+      currentOutputMode: "preview" | "export",
+      timestampMs: number,
+    ) => {
+      // Explicit still renders are event-driven, so keep scene/reset/export
+      // observability synchronous even when callback telemetry is throttled.
+      publishFrameData(frame, currentSettings, currentOutputMode);
       if (timestampMs - lastTelemetryTimestampMs < TELEMETRY_INTERVAL_MS) return;
-      emitTelemetry(frame, timestampMs);
+      lastTelemetryTimestampMs = timestampMs;
+      emitTelemetry(frame);
     };
 
     const renderFrame = (animated: boolean, timestampMs: number) => {
@@ -330,30 +433,14 @@ export function VisualizerCanvas({
       const frame = bus.frame;
       const currentSettings = effectiveSettingsRef.current;
       const currentOutputMode = outputModeSignal?.current ?? outputModeRef.current;
-      canvas.dataset.outputMode = currentOutputMode;
-      canvas.dataset.analysisSource = mode === "demo" ? "synthetic-preview" : "measured";
-      canvas.dataset.analysisSequence = String(frame.sequence);
-      canvas.dataset.scene = currentSettings.scene;
-      canvas.dataset.levelDbFs = frame.levelDbFs.toFixed(3);
-      canvas.dataset.peakLinear = frame.peak.toFixed(4);
-      canvas.dataset.crestFactor = frame.crestFactor.toFixed(4);
-      canvas.dataset.zeroCrossingRate = frame.zeroCrossingRate.toFixed(4);
-      canvas.dataset.centroidHz = frame.spectralCentroidHz.toFixed(2);
-      canvas.dataset.rolloffHz = frame.spectralRolloffHz.toFixed(2);
-      canvas.dataset.highFrequencyRatio = frame.highFrequencyRatio.toFixed(4);
-      canvas.dataset.onsetStrength = frame.onsetStrength.toFixed(4);
-      canvas.dataset.periodicityBpm = frame.periodicityBpm.toFixed(2);
-      canvas.dataset.periodicityEvidence = frame.periodicityEvidence.toFixed(4);
-      canvas.dataset.transientCandidateCount = String(frame.transientCandidateCount);
-      canvas.dataset.chromaConcentration = frame.chromaConcentration.toFixed(4);
-      canvas.dataset.dominantChroma = String(frame.dominantChroma);
-      canvas.dataset.recurrence = frame.recurrence.toFixed(4);
-      canvas.dataset.similarityCount = String(frame.selfSimilarityCount);
-      syncBackingDimensions(canvas, currentSettings, currentOutputMode);
+      syncBackingDimensionsIfNeeded(currentSettings, currentOutputMode);
       renderer.render(frame, currentSettings, readShaderTime(frame));
 
-      if (animated) reportAnimatedFrame(frame, timestampMs);
-      else reportStillFrame(frame, timestampMs);
+      if (animated) {
+        reportAnimatedFrame(frame, currentSettings, currentOutputMode, timestampMs);
+      } else {
+        reportStillFrame(frame, currentSettings, currentOutputMode, timestampMs);
+      }
     };
 
     const stopAnimation = () => {
@@ -546,9 +633,42 @@ export function VisualizerCanvas({
 
     const resizeObserver = typeof ResizeObserver === "undefined"
       ? null
-      : new ResizeObserver(renderStill);
+      : new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        const nextPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+        if (
+          updatePreviewDimensions(
+            entry.contentRect.width,
+            entry.contentRect.height,
+            nextPixelRatio,
+          )
+        ) {
+          renderStill();
+        }
+      });
+    const handleWindowResize = () => {
+      const nextPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+      if (resizeObserver) {
+        if (
+          updatePreviewDimensions(
+            previewDimensions.cssWidth,
+            previewDimensions.cssHeight,
+            nextPixelRatio,
+          )
+        ) {
+          renderStill();
+        }
+        return;
+      }
+
+      const bounds = canvas.getBoundingClientRect();
+      if (updatePreviewDimensions(bounds.width, bounds.height, nextPixelRatio)) {
+        renderStill();
+      }
+    };
     if (resizeObserver) resizeObserver.observe(canvas);
-    else window.addEventListener("resize", renderStill, { passive: true });
+    window.addEventListener("resize", handleWindowResize, { passive: true });
 
     renderStill();
     if (activeRef.current) {
@@ -564,7 +684,7 @@ export function VisualizerCanvas({
       canvas.removeEventListener("webglcontextlost", handleContextLost);
       canvas.removeEventListener("webglcontextrestored", handleContextRestored);
       if (resizeObserver) resizeObserver.disconnect();
-      else window.removeEventListener("resize", renderStill);
+      window.removeEventListener("resize", handleWindowResize);
       if (runtimeRef.current === runtime) runtimeRef.current = null;
       if (renderNowRef?.current === renderStill) renderNowRef.current = null;
       if (resetAnalysisRef?.current === runtime.resetAnalysis) {

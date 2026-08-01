@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 import type {
   AudioCaptureSettings,
   AudioSourceDetails,
@@ -7,7 +7,6 @@ import type {
 import { PITCH_CLASS_NAMES } from "@/lib/audio/scientific-analysis";
 import {
   ASPECTS,
-  PALETTES,
   findScene,
   type VisualSettings,
 } from "@/lib/visualizer/types";
@@ -70,6 +69,35 @@ function percentage(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+function indexValue(value: number): string {
+  return Math.max(0, Math.min(1, value)).toFixed(2);
+}
+
+function moveRadioFocus(
+  event: KeyboardEvent<HTMLButtonElement>,
+  currentIndex: number,
+  count: number,
+  select: (index: number) => void,
+): void {
+  let nextIndex: number | null = null;
+  if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+    nextIndex = (currentIndex + 1) % count;
+  } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+    nextIndex = (currentIndex - 1 + count) % count;
+  } else if (event.key === "Home") {
+    nextIndex = 0;
+  } else if (event.key === "End") {
+    nextIndex = count - 1;
+  }
+  if (nextIndex === null) return;
+  event.preventDefault();
+  select(nextIndex);
+  const radios = event.currentTarget
+    .closest('[role="radiogroup"]')
+    ?.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+  radios?.[nextIndex]?.focus();
+}
+
 function sceneReadouts(
   sceneId: VisualSettings["scene"],
   telemetry: Telemetry,
@@ -89,20 +117,20 @@ function sceneReadouts(
           ? PITCH_CLASS_NAMES[telemetry.dominantChroma] ?? "—"
           : "—",
       ],
-      ["Class concentration", percentage(telemetry.chromaConcentration)],
-      ["Inference", "Pitch-class energy only"],
+      ["Concentration index", indexValue(telemetry.chromaConcentration)],
+      ["Scale", "Unitless · not probability"],
     ];
   }
   if (sceneId === "trace") {
     return [
       ["RMS level", `${telemetry.levelDbFs.toFixed(1)} dBFS`],
       ["Crest factor", `${telemetry.crestFactor.toFixed(2)}×`],
-      ["Zero crossings", percentage(telemetry.zeroCrossingRate)],
+      ["Zero-crossing fraction", percentage(telemetry.zeroCrossingRate)],
     ];
   }
   if (sceneId === "lattice") {
     return [
-      ["Onset strength", percentage(telemetry.onsetStrength)],
+      ["Onset index", indexValue(telemetry.onsetStrength)],
       ["Transient candidates", String(telemetry.transientCandidateCount)],
       [
         "Period candidate",
@@ -111,13 +139,13 @@ function sceneReadouts(
           : "Gathering evidence",
       ],
       [
-        "Heuristic evidence / history",
-        `${percentage(telemetry.periodicityEvidence)} / ${telemetry.rhythmEvidenceSeconds.toFixed(1)} s`,
+        "Heuristic index / history",
+        `${indexValue(telemetry.periodicityEvidence)} / ${telemetry.rhythmEvidenceSeconds.toFixed(1)} s`,
       ],
     ];
   }
   return [
-    ["Recurrence >2 s", percentage(telemetry.recurrence)],
+    ["Cosine similarity >2 s", indexValue(telemetry.recurrence)],
     ["History compared", `${(telemetry.similarityCount / 8).toFixed(1)} s`],
     ["Matrix samples", `${telemetry.similarityCount} / 64`],
   ];
@@ -185,8 +213,8 @@ export function InspectorPanel({
         </small>
         {sourceMode === "file" && sourceDetails ? (
           <small className="science-method">
-            Decoded file overview: {sourceDetails.sampleRate} Hz · {sourceDetails.channelCount} ch
-            {sourceDetails.channelCount > 1 ? " · playback analyser downmixes to mono" : ""}
+            Decoded file overview: {sourceDetails.sampleRate} Hz · {sourceDetails.channelCount ?? "?"} ch
+            {(sourceDetails.channelCount ?? 0) > 1 ? " · playback analyser downmixes to mono" : ""}
             {" · browser decode may resample"}
           </small>
         ) : null}
@@ -200,7 +228,7 @@ export function InspectorPanel({
         ) : null}
         {sourceMode !== "file" && sourceMode !== "none" && !captureSettings && sourceDetails ? (
           <small className="science-method">
-            Analysis graph fallback: {sourceDetails.sampleRate} Hz · {sourceDetails.channelCount} ch · capture track did not report settings
+            Analysis graph fallback: {sourceDetails.sampleRate} Hz · ? ch · capture track did not report channel settings
           </small>
         ) : null}
         <a
@@ -250,43 +278,39 @@ export function InspectorPanel({
         </div>
       </section>
 
-      <section className="inspector-section" aria-labelledby="palette-title">
-        <h3 id="palette-title">COLOR SYSTEM</h3>
-        <div className="palette-grid" role="radiogroup" aria-label="Color palette">
-          {PALETTES.map((palette) => {
-            const selected = settings.palette === palette.id;
-            return (
-              <button
-                type="button"
-                key={palette.id}
-                className={`palette-button${selected ? " is-active" : ""}`}
-                role="radio"
-                aria-checked={selected}
-                onClick={() => onChange({ palette: palette.id })}
-              >
-                <span className="palette-swatches" aria-hidden="true">
-                  {palette.css.map((color) => (
-                    <i key={color} style={{ background: color }} />
-                  ))}
-                </span>
-                <span>{palette.name}</span>
-              </button>
-            );
-          })}
-        </div>
+      <section className="inspector-section optical-key-panel" aria-labelledby="optical-key-title">
+        <h3 id="optical-key-title">OPTICAL KEY</h3>
+        <dl className="optical-key-list">
+          <div>
+            <dt><i className="optical-chip optical-chip-signal" aria-hidden="true" />Electric blue</dt>
+            <dd>Signal-derived evidence</dd>
+          </div>
+          <div>
+            <dt><i className="optical-chip optical-chip-reference" aria-hidden="true" />White</dt>
+            <dd>References and annotation</dd>
+          </div>
+        </dl>
+        <p>Extent, opacity and line form carry value. Hue never adds an undeclared audio dimension.</p>
       </section>
 
       <section className="inspector-section" aria-labelledby="frame-title">
         <h3 id="frame-title">FRAME</h3>
         <div className="aspect-grid" role="radiogroup" aria-label="Canvas aspect ratio">
-          {ASPECTS.map((aspect) => (
+          {ASPECTS.map((aspect, index) => (
             <button
               key={aspect.id}
               type="button"
               role="radio"
               aria-checked={settings.aspect === aspect.id}
+              tabIndex={settings.aspect === aspect.id ? 0 : -1}
               className={settings.aspect === aspect.id ? "is-active" : ""}
               onClick={() => onChange({ aspect: aspect.id })}
+              onKeyDown={(event) => moveRadioFocus(
+                event,
+                index,
+                ASPECTS.length,
+                (nextIndex) => onChange({ aspect: ASPECTS[nextIndex].id }),
+              )}
             >
               <i className={`aspect-icon aspect-${aspect.id}`} aria-hidden="true" />
               <span>{aspect.ratio}</span>

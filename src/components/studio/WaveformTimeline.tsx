@@ -26,7 +26,7 @@ type TimelineStyle = CSSProperties & {
   "--waveform-progress": string;
 };
 
-const DEFAULT_ACCENT = "#8b5cf6";
+const DEFAULT_ACCENT = "#008CFF";
 const MAX_DEVICE_PIXEL_RATIO = 2;
 const TARGET_BAR_STRIDE = 4;
 const BAR_WIDTH_RATIO = 0.56;

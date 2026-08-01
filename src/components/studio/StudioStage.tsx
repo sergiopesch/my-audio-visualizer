@@ -1,7 +1,7 @@
 import type { ReactNode, RefObject } from "react";
 import type { SourceMode } from "@/hooks/useAudioEngine";
 import { PITCH_CLASS_NAMES } from "@/lib/audio/scientific-analysis";
-import { findPalette, findScene, type VisualSettings } from "@/lib/visualizer/types";
+import { findOpticalSystem, findScene, type VisualSettings } from "@/lib/visualizer/types";
 import type { Telemetry } from "./VisualizerCanvas";
 
 const METER_SEGMENTS = Array.from({ length: 18 }, (_, index) => index);
@@ -22,6 +22,10 @@ function sourceLabel(mode: SourceMode): string {
   return "LOCAL FILE";
 }
 
+function indexValue(value: number): string {
+  return Math.max(0, Math.min(1, value)).toFixed(2);
+}
+
 function sceneReadouts(
   scene: VisualSettings["scene"],
   telemetry: Telemetry,
@@ -40,7 +44,7 @@ function sceneReadouts(
           ? PITCH_CLASS_NAMES[telemetry.dominantChroma] ?? "—"
           : "—",
       ],
-      ["CONCENTRATION", `${Math.round(telemetry.chromaConcentration * 100)}%`],
+      ["CONCENTRATION INDEX", indexValue(telemetry.chromaConcentration)],
     ];
   }
   if (scene === "trace") {
@@ -51,15 +55,19 @@ function sceneReadouts(
   }
   if (scene === "lattice") {
     return [
-      ["ONSET", `${Math.round(telemetry.onsetStrength * 100)}%`],
+      ["ONSET INDEX", indexValue(telemetry.onsetStrength)],
       [
         "PERIOD",
         telemetry.periodicityBpm > 0 ? `${telemetry.periodicityBpm.toFixed(1)} BPM-eq.` : "—",
       ],
+      [
+        "EVIDENCE",
+        `${indexValue(telemetry.periodicityEvidence)} · ${telemetry.transientCandidateCount} candidates`,
+      ],
     ];
   }
   return [
-    ["RECURRENCE", `${Math.round(telemetry.recurrence * 100)}%`],
+    ["COSINE SIMILARITY", indexValue(telemetry.recurrence)],
     ["HISTORY", `${(telemetry.similarityCount / 8).toFixed(1)} s`],
   ];
 }
@@ -74,7 +82,7 @@ export function StudioStage({
   isPlaying,
 }: StudioStageProps) {
   const scene = findScene(settings.scene);
-  const palette = findPalette(settings.palette);
+  const opticalSystem = findOpticalSystem(settings.opticalSystem);
   const meterLevel = Math.min(1, telemetry.energy * settings.sensitivity * 2.1);
   const readouts = sceneReadouts(settings.scene, telemetry);
 
@@ -93,6 +101,10 @@ export function StudioStage({
         <span className={isPlaying ? "is-live" : ""} />
         {isPlaying ? "SIGNAL ACTIVE" : "SIGNAL HELD"}
       </div>
+      <div className="stage-optical-key" aria-label="Optical encoding: electric blue is signal evidence; white is reference geometry">
+        <span><i className="optical-chip optical-chip-signal" aria-hidden="true" />SIGNAL</span>
+        <span><i className="optical-chip optical-chip-reference" aria-hidden="true" />REFERENCE</span>
+      </div>
       <div className="stage-information">
         <div className="stage-track">
           <span>NOW VISUALIZING</span>
@@ -103,7 +115,7 @@ export function StudioStage({
             <i
               key={segment}
               className={segment / METER_SEGMENTS.length < meterLevel ? "is-lit" : ""}
-              style={{ backgroundColor: palette.css[segment > 14 ? 2 : segment > 9 ? 1 : 0] }}
+              style={{ backgroundColor: opticalSystem.css[0] }}
             />
           ))}
         </div>

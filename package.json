@@ -10,6 +10,7 @@
     "audit:ci": "node scripts/audit-ci.mjs",
     "dev": "next dev",
     "build": "next build",
+    "docs:screenshot": "npm run science:fixtures && node scripts/capture-readme.mjs",
     "start": "next start",
     "science:fixtures": "node scripts/generate-science-fixtures.mjs",
     "science:fixtures:check": "node scripts/generate-science-fixtures.mjs --check",

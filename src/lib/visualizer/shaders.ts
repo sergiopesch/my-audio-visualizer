@@ -76,12 +76,6 @@ float sampleSimilarity(vec2 position) {
   return texture(uSimilarity, clamp(position, vec2(0.0), vec2(1.0))).r;
 }
 
-vec3 colorRamp(float position) {
-  float amount = saturate(position);
-  vec3 low = mix(uPrimary, uSecondary, smoothstep(0.0, 0.62, amount));
-  return mix(low, uAccent, smoothstep(0.6, 1.0, amount));
-}
-
 vec2 stagePoint() {
   vec2 point = vUv - 0.5;
   point.x *= uResolution.x / max(1.0, uResolution.y);
@@ -102,15 +96,17 @@ vec3 renderField() {
   float curve = lineAt(localY, height, 0.005 + uSettings.w * 0.004) * evidence;
   float separator = 0.86 + 0.14 * smoothstep(0.06, 0.13, fract(vUv.x * 24.0));
 
-  float centroidMarker = lineAt(vUv.x, uSpectral.x, 0.0025) * evidence;
-  float rolloff = lineAt(vUv.x, uSpectral.y, 0.0025) * evidence;
+  float centroidMarker = lineAt(vUv.x, uSpectral.x, 0.0032) * evidence;
+  float rolloff = lineAt(vUv.x, uSpectral.y, 0.0016) * evidence;
   float highRegion = smoothstep(0.62, 1.0, vUv.x) * uSpectral.z * fill;
+  float referenceAxis = lineAt(vUv.y, 0.02, 0.0015);
 
-  vec3 color = colorRamp(vUv.x) * fill * separator * (0.34 + band * 0.9);
+  vec3 color = uPrimary * fill * separator * (0.34 + band * 0.9);
   color += uPrimary * curve * 0.86;
-  color += uAccent * centroidMarker * 0.72;
-  color += uSecondary * rolloff * 0.64;
-  color += uAccent * highRegion * 0.28;
+  color += uPrimary * centroidMarker * 0.72;
+  color += uPrimary * rolloff * 0.64;
+  color += uPrimary * highRegion * 0.28;
+  color += uAccent * referenceAxis * 0.22;
   return color;
 }
 // scene:field:end
@@ -135,11 +131,13 @@ vec3 renderOrbit(vec2 point) {
   float dominant = 1.0 - step(0.5, abs(sector - dominantClass));
   dominant *= step(0.02, concentration) * outline;
   float concentrationRing = lineAt(radius, 0.055, 0.004) * concentration;
+  float referenceRing = lineAt(radius, 0.055, 0.0014);
 
-  vec3 color = colorRamp(pitchPosition) * body * (0.24 + chroma * 0.95);
+  vec3 color = uPrimary * body * (0.24 + chroma * 0.95);
   color += uPrimary * outline * 0.7;
-  color += uAccent * dominant * (0.28 + concentration * 0.52);
-  color += uSecondary * concentrationRing * 0.72;
+  color += uPrimary * dominant * (0.28 + concentration * 0.52);
+  color += uPrimary * concentrationRing * 0.72;
+  color += uSecondary * referenceRing * 0.2;
   return color;
 }
 // scene:orbit:end
@@ -161,12 +159,14 @@ vec3 renderTrace() {
   float metricRegion = smoothstep(0.035, 0.025, vUv.x);
   float crestGauge = metricRegion * step(vUv.y, crest);
   float crossingGauge = step(vUv.y, 0.018) * step(vUv.x, zeroCrossings);
+  float zeroAxis = lineAt(vUv.y, 0.5, 0.0012);
 
-  vec3 color = colorRamp(vUv.x) * trace * (0.66 + zeroCrossings * 0.22);
-  color += uSecondary * (rmsUpper + rmsLower) * 0.42;
-  color += uAccent * (peakUpper + peakLower) * 0.3;
-  color += uAccent * crestGauge * 0.42;
-  color += uSecondary * crossingGauge * 0.58;
+  vec3 color = uPrimary * trace * (0.66 + zeroCrossings * 0.22);
+  color += uPrimary * (rmsUpper + rmsLower) * 0.42;
+  color += uPrimary * (peakUpper + peakLower) * 0.3;
+  color += uPrimary * crestGauge * 0.42;
+  color += uPrimary * crossingGauge * 0.58;
+  color += uSecondary * zeroAxis * 0.2;
   return color;
 }
 // scene:trace:end
@@ -195,11 +195,13 @@ vec3 renderLattice(vec2 point) {
   float evidenceGrid = cell
     * evidenceStrength
     * smoothstep(0.62, 0.08, abs(radius - phaseRadius));
+  float referenceRing = lineAt(radius, 0.59, 0.003);
 
-  vec3 color = colorRamp(bpm) * evidenceGrid * 0.16;
+  vec3 color = uPrimary * evidenceGrid * 0.16;
   color += uPrimary * phaseRing * (0.32 + evidenceStrength * 0.72);
-  color += uAccent * core * (0.55 + onset * 0.8);
-  color += uSecondary * evidenceArc * 0.68;
+  color += uPrimary * core * (0.55 + onset * 0.8);
+  color += uPrimary * evidenceArc * 0.68;
+  color += uSecondary * referenceRing * 0.2;
   return color;
 }
 // scene:lattice:end
@@ -221,10 +223,10 @@ vec3 renderContour() {
     + lineAt(matrixPosition.y, countFraction, 0.0025)
   ) * step(0.01, countFraction);
 
-  vec3 color = colorRamp(similarity) * similarity * (0.25 + contour * 0.78);
+  vec3 color = uPrimary * similarity * (0.25 + contour * 0.78);
   color += uPrimary * contour * similarity * 0.28;
   color += uSecondary * diagonal * 0.42;
-  color += uAccent * frontier * recurrence * 0.52;
+  color += uPrimary * frontier * recurrence * 0.52;
   return color;
 }
 // scene:contour:end
@@ -247,8 +249,12 @@ void main() {
   float presentation = mix(0.72, 1.34, uSettings.x) * mix(0.88, 1.18, uSettings.z);
   vec3 color = evidence * presentation * (0.76 + vignette * 0.24);
   float compression = mix(0.42, 0.62, uHighlightCompression);
-  color = color / (vec3(1.0) + color * compression);
-  color = pow(max(color, vec3(0.0)), vec3(0.92));
+  float pigmentIntensity = max(max(color.r, color.g), color.b);
+  if (pigmentIntensity > 0.0) {
+    float compressedIntensity = pigmentIntensity / (1.0 + pigmentIntensity * compression);
+    compressedIntensity = min(1.0, pow(max(compressedIntensity, 0.0), 0.92));
+    color *= compressedIntensity / pigmentIntensity;
+  }
   color += uBackground;
   outColor = vec4(color, 1.0);
 }

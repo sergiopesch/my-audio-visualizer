@@ -13,7 +13,7 @@ import { useCanvasRecorder } from "@/hooks/useCanvasRecorder";
 import {
   DEFAULT_VISUAL_SETTINGS,
   SCENES,
-  findPalette,
+  findOpticalSystem,
   type SceneId,
   type VisualSettings,
 } from "@/lib/visualizer/types";
@@ -90,12 +90,33 @@ function saveCanvasSnapshot(canvas: HTMLCanvasElement, fileName: string): void {
   );
 }
 
-function isTextInput(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(
+    target.closest(
+      [
+        "a[href]",
+        "button",
+        "input",
+        "select",
+        "summary",
+        "textarea",
+        '[contenteditable]:not([contenteditable="false"])',
+        '[role="button"]',
+        '[role="checkbox"]',
+        '[role="link"]',
+        '[role="menuitem"]',
+        '[role="option"]',
+        '[role="radio"]',
+        '[role="slider"]',
+        '[role="spinbutton"]',
+        '[role="switch"]',
+        '[role="tab"]',
+        '[role="textbox"]',
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(","),
+    ),
   );
 }
 
@@ -312,7 +333,19 @@ export function AudioVisualizerStudio() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isTextInput(event.target) || exportOpen) return;
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        event.repeat ||
+        event.isComposing ||
+        isInteractiveTarget(event.target) ||
+        exportOpen
+      ) {
+        return;
+      }
       const actions = keyboardActionsRef.current;
       if (event.code === "Space") {
         event.preventDefault();
@@ -393,7 +426,7 @@ export function AudioVisualizerStudio() {
 
   const busy = audioStatus === "loading";
   const error = uiError ?? audioError;
-  const palette = findPalette(settings.palette);
+  const opticalSystem = findOpticalSystem(settings.opticalSystem);
 
   return (
     <div
@@ -440,7 +473,7 @@ export function AudioVisualizerStudio() {
             currentTime={currentTime}
             duration={duration}
             peaks={waveformPeaks}
-            accent={palette.css[0]}
+            accent={opticalSystem.css[0]}
             onPlayPause={() => void togglePrimaryPlayback()}
             onStop={stopWithAnalysisReset}
             onSeek={seekWithAnalysisReset}

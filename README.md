@@ -10,7 +10,9 @@ AV/01 is what happened when I stopped treating that idea like an effect and star
 
 It turns short-time spectrum, octave-folded pitch-class energy, waveform dynamics, onset-envelope periodicity and recent spectral recurrence into five visual systems that can be played, shaped, captured and recorded in real time. Those terms are deliberate: AV/01 does not pretend to identify notes, chords, beats, tempo or song sections when the evidence does not support it.
 
-![The AV/01 visual instrument showing measured spectral recurrence](output/playwright/av01-studio-readme.jpg)
+This pass gives that instrument one optical language: black for silence and the stage, electric blue for signal-derived evidence, and white for references and annotation. There are no alternate colour skins and no rainbow shortcuts. If a value changes, geometry, extent, opacity or line form has to explain why.
+
+![The AV/01 visual instrument showing measured spectral recurrence](output/playwright/av01-studio-readme.png)
 
 ## Where it started
 
@@ -27,6 +29,7 @@ I am keeping that first version visible. It is not something I want to erase und
 - [From Audio Visualizer to AV/01](docs/PRODUCT-REVIEW.md) explains what changed, what I learned from ThorstenClip and why I rebuilt the system this way.
 - [The scientific contract and provenance](docs/SCIENCE.md) states exactly what each scene computes, what informs it and what it cannot claim.
 - [The release-candidate validation record](docs/VALIDATION.md) publishes the fixtures, measured controls, failures and remaining open gates.
+- [The research roadmap](docs/RESEARCH-ROADMAP.md) separates the improvements I can defend now from the experiments that still need new analysis and validation.
 
 Along the way, I built ThorstenClip to find out how much further this idea could go. It taught me a lot about stage-first design, deeper audio analysis, visual composition and making the final result feel authored instead of decorative.
 
@@ -40,7 +43,7 @@ AV/01 is a browser-native visual instrument for music, voice, instruments and li
 - Capture audio from a shared tab or application.
 - Use a microphone for a room, voice or instrument.
 - Read the signal through 24 ERB-rate-spaced triangular bands, twelve octave-folded pitch classes, time-domain dynamics, onset-envelope periodicity and rolling spectral self-similarity.
-- Shape five real-time scenes with sensitivity, intensity, glow, detail, palette, frame and visual-comfort controls.
+- Shape five real-time scenes with sensitivity, intensity, glow, detail, frame and visual-comfort controls inside one fixed optical system.
 - Save still frames or record a complete visual performance with audio.
 - Keep the entire process local to the browser.
 
@@ -56,11 +59,11 @@ Your audio stays with you. There is no upload service, account or tracking layer
 | `4` | **Rhythm Lattice** · `AV01-SCI-004` | Spectral-change onset strength and short-term autocorrelation periodicity | A confirmed beat, tempo, downbeat, meter or groove |
 | `5` | **Recurrence Atlas** · `AV01-SCI-005` | Rolling cosine self-similarity of normalized log-ERB spectral shape | Song sections, motifs, sources or structural boundaries |
 
-Every scene can be combined with four color systems and three output frames. Sensitivity, intensity, glow and detail remain independent, so the result can become yours rather than a fixed preset. The formulas, timing windows, sources and limitations behind every claim ID live in the [scientific contract](docs/SCIENCE.md).
+Every scene can use three output frames. Sensitivity, intensity, glow and detail alter presentation without changing the analysis underneath. The formulas, timing windows, pixel mappings, sources and limitations behind every claim ID live in the [scientific contract](docs/SCIENCE.md).
 
 ## The differentiator: representation, not skin
 
-AV/01 is not five cosmetic treatments of one FFT. Each scene owns a non-overlapping evidence family. Automated contract tests enforce the declarations and scan every WebGL scene for cross-scene evidence access; optimized-browser signal gates exercise the real Canvas 2D fallback against the same ownership map, keeping fixed-duration evidence histories independent of software-GPU throughput. Matched controls then change one signal property at a time:
+AV/01 is not five cosmetic treatments of one FFT. Each scene owns a separate declared feature channel and transform. Automated contract tests enforce the routing declarations and scan every WebGL scene for cross-scene feature access; optimized-browser signal gates exercise the real Canvas 2D fallback against the same map, keeping fixed-duration evidence histories separate from software-GPU throughput. That proves implementation separation, not statistical independence or scientific validity. Matched controls then change one signal property at a time:
 
 | Controlled comparison | Representation expected to change | Evidence expected to remain stable |
 | --- | --- | --- |
@@ -71,6 +74,18 @@ AV/01 is not five cosmetic treatments of one FFT. Each scene owns a non-overlapp
 | A–B–A versus A–B–C spectral-shape sequences | Recurrence Atlas off-diagonal similarity | The declared per-frame spectral-shape vocabulary |
 
 That is the scientifically defensible differentiator: five falsifiably different representations, visible methods and explicit limits. The controls demonstrate implementation separation; they do not prove that AV/01 is perceptually superior, peer reviewed or a calibrated measurement instrument.
+
+## One optical language
+
+The current brand is intentionally narrow:
+
+| Source pigment | Role |
+| --- | --- |
+| `#000000` | Silence, absence and the stage |
+| `#008CFF` | Signal-derived evidence, live state and interaction |
+| `#FFFFFF` | Reference geometry, thresholds, labels and structure |
+
+All darker, quieter or softer tones are opacity blends of those three source pigments. Electric blue never stands in for a scientific variable by itself, and colour is never the only cue for selection, recording, error or focus. This follows current guidance on colour integrity and accessible non-text contrast while keeping AV/01 unmistakably its own instrument.
 
 ## It listens to more than volume
 
@@ -84,7 +99,7 @@ The original visualizer reduced each frame of audio to one peak value. AV/01 kee
 - Spectral centroid, 85% rolloff and a high-frequency power ratio as acoustic descriptors—not direct measures of perceived brightness.
 - Silence hysteresis so the visuals settle instead of chattering around a threshold.
 
-The level display is normalized digital dBFS, not LUFS or acoustic SPL. The analyser is a browser-defined mono downmix, microphone processing can vary by device and browser, and the nominal 50 Hz feature clock can jitter. The goal is not to show more data. It is to make the visuals respond in ways that feel musical while staying honest about what was measured.
+The level display is normalized digital dBFS, not LUFS or acoustic SPL. Concentration, onset, periodicity support and cosine similarity are shown as unitless indices rather than percentages that could look like probabilities. The analyser is a browser-defined mono downmix, microphone processing can vary by device and browser, and the nominal 50 Hz feature clock can jitter. The goal is not to show more data. It is to make the visuals respond in ways that feel musical while staying honest about what was measured.
 
 ## Start the instrument
 
@@ -138,7 +153,7 @@ Shortcuts are ignored while a form control is focused or the export dialog is op
 
 ## Exporting a performance
 
-AV/01 records in real time at 30 FPS. The canvas and the recordable audio destination are joined inside the browser, so the recording uses the same signal, scene, palette, settings and playback clock as the live stage.
+AV/01 records in real time at 30 FPS. The canvas and the recordable audio destination are joined inside the browser, so the recording uses the same signal, scene, fixed optical system, settings and playback clock as the live stage.
 
 | Frame | Dimensions | File source | Live source |
 | --- | ---: | --- | --- |
@@ -178,7 +193,7 @@ file / system share / microphone
               └──── canvas stream + audio ──► MediaRecorder
 ```
 
-The render loop is ref-driven and does not push React state on every frame. Feature arrays are allocated once and reused. The media playhead coordinates transport and full-track export, while analysis history resets across seek, source change, stop and replay-from-end. No scene consumes an autonomous presentation clock; the feature clock remains subject to the browser-timing limits in the [scientific contract](docs/SCIENCE.md#timing-and-repeatability).
+The render loop is ref-driven and does not push React state on every frame. Feature arrays are allocated once and reused. Canvas dimensions are cached between resizes, test telemetry is published at a bounded cadence, and the recurrence texture is uploaded only while that scene is active and its matrix has changed. The media playhead coordinates transport and full-track export, while analysis history resets across seek, source change, stop and replay-from-end. No scene consumes an autonomous presentation clock; the feature clock remains subject to the browser-timing limits in the [scientific contract](docs/SCIENCE.md#timing-and-repeatability).
 
 | Path | Responsibility |
 | --- | --- |
@@ -194,8 +209,11 @@ The render loop is ref-driven and does not push React state on every frame. Feat
 
 - The landing animation can always be paused from the canvas or with `Space`.
 - A reduced-motion preference opens the landing experience as a static frame.
+- Increased-contrast and reduced-transparency preferences strengthen or simplify the interface.
 - **Visual comfort** is enabled by default and reduces renderer glow and bright-highlight contrast.
-- Scene, palette, frame, transport, timeline and switch controls expose semantic names and states.
+- Measured frames are contained rather than cropped, including on narrow screens.
+- Scene and frame radiogroups support arrow keys, `Home` and `End`; global shortcuts never steal native control activation.
+- Scene, frame, transport, timeline and switch controls expose semantic names and states.
 - Focus indicators, dialog semantics and error announcements are built into the interface.
 
 Visual comfort is a comfort aid, not a certified photosensitivity safeguard.
@@ -224,13 +242,17 @@ npm run audit:ci
 npm run test:e2e
 ```
 
+To rebuild the measured README image, run the app at `http://127.0.0.1:3000` and then run `npm run docs:screenshot`. Set `AV01_CAPTURE_URL` when the app is running somewhere else. The capture script opens the deterministic A–B–A–C fixture, waits for a populated Recurrence Atlas and rejects browser console errors.
+
 The first AV/01 rebuild was exercised in a real browser across desktop, mobile and short-landscape layouts; WebGL context loss; Canvas 2D fallback; reduced motion; file playback; background-tab recording; and a complete 1280 × 720 VP9/Opus video export. That remains the historical UI/export baseline. The scientific-analysis candidate now has a separate [validation record](docs/VALIDATION.md): deterministic, scene-routing, matched-signal, reset and local-file export gates pass; live-capture integration is partial and the defined long-session gate is still open. These are internal engineering results, not peer review, perceptual validation or metrological approval.
 
 ## What comes next
 
 This version has a clear technical boundary: `AnalyserNode`, WebGL 2 with Canvas fallback and real-time `MediaRecorder` output.
 
-The next steps I care about are AudioWorklet/worker/WASM analysis, tuning-aware pitch-class energy, multiple periodicity hypotheses, multiscale recurrence, recorded cross-browser signal fixtures, independent method review, a progressive WebGPU renderer, project files, automation, MIDI/OSC control and deterministic offline export through WebCodecs.
+The next step I care about most is a public **Experiment / Compare** view: the existing matched fixtures side by side, with the expected change, expected invariant and observed values visible instead of hidden in a test log. After that comes sample-clocked AudioWorklet capture with a fixed-hop STFT and worker/WASM analysis, tuning-aware pitch-class energy, multiple periodicity hypotheses, multiscale recurrence, recorded cross-browser signal fixtures and independent method review.
+
+The strongest candidate for a genuinely new sixth representation is a spectrotemporal modulation field: temporal modulation rate against spectral modulation scale. That would ask a new question—how energy fluctuates across temporal rate and spectral scale—rather than repainting one of the five questions AV/01 already answers. It belongs on the roadmap until its transform, controls and limitations are validated end to end.
 
 The goal is not more particles, more controls or louder effects. I want AV/01 to become the most expressive browser-native audio visualizer I can build: musically aware, visually distinctive, technically honest and open enough for someone else to make the result their own.
 

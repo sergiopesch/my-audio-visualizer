@@ -1,53 +1,45 @@
 ---
 name: visualization-dev
-description: Develop and modify audio visualization effects and rendering logic
+description: Develop AV/01 signal representations without breaking the scientific or optical contracts
 ---
 
 # Overview
 
-Handles creation and modification of audio-reactive visualization effects using Canvas API and Web Audio API frequency data.
+Use this guidance when changing a scene, renderer, feature-to-pixel mapping or visual control.
 
-# When to use
+# Required process
 
-- When adding a new visualization mode
-- When modifying colors, grid, or animation behavior
-- When changing how audio data maps to visual output
+1. Name the signal representation and the narrow question it can answer.
+2. Declare its exact `FeatureFrame` ownership in `src/lib/visualizer/types.ts`.
+3. Add primary scientific sources and an explicit non-inference boundary.
+4. Define the pixel mapping: axis, geometry, amplitude transform, history and smoothing.
+5. Implement matching WebGL and Canvas 2D routes without autonomous time, noise or random decoration.
+6. Use only black `#000000`, electric blue `#008CFF`, white `#FFFFFF` and their opacity blends.
+7. Add a matched positive and negative control, deterministic unit coverage and a browser experiment.
+8. Update `docs/SCIENCE.md`, `docs/VALIDATION.md` and the in-product method disclosure.
 
-# Capabilities
+# Current scene families
 
-- Design new Canvas-based visualization effects
-- Modify the audio-to-visual mapping pipeline
-- Adjust FFT parameters (fftSize, smoothingTimeConstant)
-- Create new color schemes and animation patterns
-- Add visualization mode switching
+- Auditory Field: ERB-spaced spectral bands, centroid, rolloff and high-frequency power fraction.
+- Tonal Orbit: twelve-bin octave-folded pitch-class energy and unitless concentration index.
+- Temporal Scope: mono waveform, RMS, sample peak, crest factor and zero-crossing fraction.
+- Rhythm Lattice: onset change and short-term autocorrelation periodicity with a heuristic index.
+- Recurrence Atlas: rolling cosine self-similarity of normalized log-ERB spectral shape.
 
-# Instructions
+# Optical roles
 
-1. Understand the current audio pipeline:
-   - Audio -> AnalyserNode (fftSize=1024, smoothing=0.3)
-   - getByteFrequencyData -> max amplitude -> threshold
-   - Cells within threshold illuminate with HSL gradient
-2. For new visualization modes:
-   - Create a new rendering function
-   - Add state to toggle between modes
-   - Integrate into the `animate()` function
-3. For color changes:
-   - Modify the HSL calculation in the cell rendering loop
-   - Current: `hsl(200, 100%, ${80 - 50 * fraction}%)`
-4. For grid changes:
-   - Modify `cols`, `rows`, `canvasWidth`, `canvasHeight`
-   - The cells array will recompute via useMemo
-5. Test with various audio genres (bass-heavy, vocal, electronic)
+- Electric blue is signal-derived evidence.
+- White is reference geometry, thresholds and annotations.
+- Black is zero or absence.
+- Magnitude is encoded by extent, opacity and/or line weight. Hue does not encode an extra variable.
 
-# Constraints
+# Performance constraints
 
-- Keep rendering inside requestAnimationFrame
-- Target 60fps; avoid heavy computation in the animation loop
-- Pre-compute what you can outside the loop (use useMemo)
-- Maintain the existing animation cleanup pattern
+- Analysis cadence and rendering cadence remain separate.
+- Avoid allocation, layout reads and DOM mutation in the animation loop.
+- Update the self-similarity texture only when that scene is active and the matrix changes.
+- Preserve full-frame containment at every aspect ratio.
 
-# Output format
+# Definition of done
 
-- Description of the visual effect
-- Code changes with explanations
-- Testing notes for different audio types
+All required commands in `.claude/CLAUDE.md` pass, both renderers preserve the declared mapping, keyboard and responsive journeys work, and the documentation states both the evidence and its limits.

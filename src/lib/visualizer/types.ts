@@ -2,13 +2,13 @@ import type { FeatureFrame } from "@/lib/audio";
 
 export type SceneId = "field" | "orbit" | "trace" | "lattice" | "contour";
 
-export type PaletteId = "voltage" | "solar" | "tidal" | "infrared";
+export type OpticalSystemId = "electric";
 
 export type AspectId = "landscape" | "square" | "portrait";
 
 export interface VisualSettings {
   scene: SceneId;
-  palette: PaletteId;
+  opticalSystem: OpticalSystemId;
   aspect: AspectId;
   intensity: number;
   bloom: number;
@@ -38,8 +38,8 @@ export interface SceneDefinition {
   evidence: readonly string[];
 }
 
-export interface PaletteDefinition {
-  id: PaletteId;
+export interface OpticalSystemDefinition {
+  id: OpticalSystemId;
   name: string;
   background: readonly [number, number, number];
   primary: readonly [number, number, number];
@@ -114,7 +114,7 @@ export const SCENES: readonly SceneDefinition[] = [
     mapping: "Onset strength excites the core · phase advances the lattice · evidence limits visibility",
     representation: "Spectral-change onset strength with short-term autocorrelation periodicity",
     question: "Is the recent onset envelope repeating at a plausible pulse period?",
-    limitation: "It does not assert a beat, downbeat, musical tempo, meter, or perceptual groove.",
+    limitation: "It does not assert a beat, downbeat, musical tempo, meter, or groove; vibrato and noise can create candidates, while soft onsets can be missed.",
     primaryFeatures: [
       "onsetStrength",
       "periodicityBpm",
@@ -147,42 +147,15 @@ export const SCENES: readonly SceneDefinition[] = [
   },
 ] as const;
 
-export const PALETTES: readonly PaletteDefinition[] = [
+export const OPTICAL_SYSTEMS: readonly OpticalSystemDefinition[] = [
   {
-    id: "voltage",
-    name: "Voltage",
-    background: [0.012, 0.02, 0.025],
-    primary: [0.78, 1, 0.26],
-    secondary: [0.08, 0.82, 0.72],
-    accent: [1, 0.28, 0.12],
-    css: ["#c8ff43", "#14d1b8", "#ff471f"],
-  },
-  {
-    id: "solar",
-    name: "Solar",
-    background: [0.025, 0.014, 0.01],
-    primary: [1, 0.84, 0.38],
-    secondary: [1, 0.27, 0.08],
-    accent: [1, 0.96, 0.78],
-    css: ["#ffd661", "#ff4514", "#fff5c7"],
-  },
-  {
-    id: "tidal",
-    name: "Tidal",
-    background: [0.008, 0.018, 0.035],
-    primary: [0.16, 0.75, 1],
-    secondary: [0.26, 1, 0.73],
-    accent: [0.78, 0.66, 1],
-    css: ["#29bfff", "#42ffba", "#c7a8ff"],
-  },
-  {
-    id: "infrared",
-    name: "Infrared",
-    background: [0.022, 0.008, 0.014],
-    primary: [1, 0.1, 0.28],
-    secondary: [1, 0.38, 0.08],
-    accent: [0.96, 0.72, 0.78],
-    css: ["#ff1a47", "#ff6114", "#f5b8c7"],
+    id: "electric",
+    name: "Zero / Signal / Reference",
+    background: [0, 0, 0],
+    primary: [0, 140 / 255, 1],
+    secondary: [1, 1, 1],
+    accent: [1, 1, 1],
+    css: ["#008CFF", "#FFFFFF", "#FFFFFF"],
   },
 ] as const;
 
@@ -194,7 +167,7 @@ export const ASPECTS: readonly AspectDefinition[] = [
 
 export const DEFAULT_VISUAL_SETTINGS: VisualSettings = {
   scene: "field",
-  palette: "voltage",
+  opticalSystem: "electric",
   aspect: "landscape",
   intensity: 0.78,
   bloom: 0.58,
@@ -208,8 +181,9 @@ export function findScene(id: SceneId): SceneDefinition {
   return SCENES.find((scene) => scene.id === id) ?? SCENES[0];
 }
 
-export function findPalette(id: PaletteId): PaletteDefinition {
-  return PALETTES.find((palette) => palette.id === id) ?? PALETTES[0];
+export function findOpticalSystem(id: OpticalSystemId): OpticalSystemDefinition {
+  return OPTICAL_SYSTEMS.find((opticalSystem) => opticalSystem.id === id)
+    ?? OPTICAL_SYSTEMS[0];
 }
 
 export function findAspect(id: AspectId): AspectDefinition {
