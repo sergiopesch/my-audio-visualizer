@@ -305,6 +305,7 @@ export class AudioFeatureBus implements FeatureBus {
       periodicityEvidence: 0,
       pulsePhase: 0,
       rhythmEvidenceSeconds: 0,
+      transientCandidateCount: 0,
       isSilent: true,
       silenceDurationSeconds: 0,
       waveform,
@@ -407,6 +408,7 @@ export class AudioFeatureBus implements FeatureBus {
     frame.periodicityEvidence = 0;
     frame.pulsePhase = 0;
     frame.rhythmEvidenceSeconds = 0;
+    frame.transientCandidateCount = 0;
     frame.isSilent = true;
     frame.silenceDurationSeconds = 0;
     frame.waveform.fill(0);
@@ -786,12 +788,17 @@ export class AudioFeatureBus implements FeatureBus {
         ? Math.max(this.options.spectrumFloorDb, 20 * Math.log10(frame.rms))
         : this.options.spectrumFloorDb;
 
-    const rhythm = this.rhythmTracker.update(frame.onsetStrength, deltaSeconds);
+    const rhythm = this.rhythmTracker.update(
+      frame.onsetStrength,
+      deltaSeconds,
+      fluxTarget,
+    );
     frame.periodicityBpm = rhythm.periodicityBpm;
     frame.periodicitySeconds = rhythm.periodicitySeconds;
     frame.periodicityEvidence = rhythm.periodicityEvidence;
     frame.pulsePhase = rhythm.pulsePhase;
     frame.rhythmEvidenceSeconds = rhythm.evidenceSeconds;
+    frame.transientCandidateCount = rhythm.transientCandidateCount;
 
     this.similarityAccumulatorSeconds += deltaSeconds;
     if (initialize || this.similarityAccumulatorSeconds >= SIMILARITY_INTERVAL_SECONDS) {

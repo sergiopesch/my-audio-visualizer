@@ -103,6 +103,7 @@ function sceneReadouts(
   if (sceneId === "lattice") {
     return [
       ["Onset strength", percentage(telemetry.onsetStrength)],
+      ["Transient candidates", String(telemetry.transientCandidateCount)],
       [
         "Period candidate",
         telemetry.periodicityBpm > 0

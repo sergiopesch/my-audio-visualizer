@@ -31,10 +31,16 @@ jobs:
       - name: Audit dependencies
         run: npm run audit:ci
       - name: Lint
-        run: npm run lint
+        run: npm run lint -- --max-warnings=0
       - name: Type-check
         run: npm run type-check --if-present
       - name: Test
         run: npm test --if-present
+      - name: Verify scientific fixtures
+        run: npm run science:fixtures:check
       - name: Build
         run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser end-to-end tests
+        run: npm run test:e2e:ci

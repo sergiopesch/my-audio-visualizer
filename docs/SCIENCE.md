@@ -18,13 +18,29 @@ The implementation described here was audited against the working tree on 1 Augu
 
 | Claim ID | Scene | Implemented representation | Narrow question | Claim deliberately excluded | Release status |
 | --- | --- | --- | --- | --- | --- |
-| `AV01-SCI-001` | **Auditory Field** | A browser-defined, Blackman-windowed short-time spectrum grouped into 24 ERB-rate-spaced triangular bands | Where is short-time spectral energy distributed across those ERB-rate-spaced regions? | Source separation, instrument recognition, auditory masking or an individualized hearing model | Internally validated on the recorded local-file path |
+| `AV01-SCI-001` | **Auditory Field** | A browser-defined, Blackman-windowed short-time spectrum summarized as 24 ERB-rate-spaced triangular-band RMS-like magnitudes | How does RMS-like spectral magnitude vary across those ERB-rate-spaced regions? | Source separation, instrument recognition, auditory masking or an individualized hearing model | Internally validated on the recorded local-file path |
 | `AV01-SCI-002` | **Tonal Orbit** | Twelve-bin, octave-folded equal-tempered pitch-class energy | How concentrated is current spectral energy among twelve pitch classes? | Played-note, octave, tuning, chord or key identification | Internally validated on the recorded local-file path |
 | `AV01-SCI-003` | **Temporal Scope** | Recent mono waveform plus RMS, sample peak, peak-to-RMS crest factor and zero-crossing rate | How is amplitude changing inside the current analysis window? | SPL, LUFS, stereo phase or laboratory oscilloscope measurement | Internally validated on the recorded local-file path |
 | `AV01-SCI-004` | **Rhythm Lattice** | Positive log-spectral change followed by short-term autocorrelation of an onset-strength envelope | Does recent onset evidence repeat at a plausible pulse period? | Confirmed beat, downbeat, tempo, meter or groove | Internally validated on the recorded local-file path |
 | `AV01-SCI-005` | **Recurrence Atlas** | Rolling non-negative cosine self-similarity of level-normalized, mean-centred log-ERB vectors | When has recent spectral shape resembled another recent moment? | Song-section, motif, source or structural-boundary recognition | Internally validated on the recorded local-file path |
 
 The five mappings are authored visual interpretations. The papers below establish precedents for the signal representations, not for AV/01's colors, geometry or artistic meaning.
+
+## What the scientific differentiator establishes
+
+The differentiator is **representation-level separation**. Each scene declares a non-overlapping `FeatureFrame` family, WebGL contract tests prohibit cross-scene evidence access, and the Canvas fallback is reviewed against the same ownership map. The renderer contains no autonomous clock, procedural noise or random grain that could manufacture motion independently of the declared evidence.
+
+Matched controls make that separation falsifiable:
+
+| Controlled comparison | Expected change | Expected invariant |
+| --- | --- | --- |
+| Equal-RMS 375 Hz / 6 kHz tones | ERB-band position, centroid, rolloff and high-frequency ratio | Waveform RMS level |
+| A3 / A4 | Auditory-band position and waveform period | Strongest octave-folded pitch class A |
+| Waveform / polarity inverse | Displayed waveform sign | Magnitude-derived bands, RMS, peak and crest factor |
+| Periodic / jittered transient trains with equal event count | Short-term onset-envelope autocorrelation evidence | Source event count |
+| A–B–A / A–B–C spectral-shape sequences | Off-diagonal recent self-similarity | The declared per-frame ERB-shape representation |
+
+Passing these controls establishes that AV/01 implements and routes five different signal representations under the declared fixtures. It does **not** establish perceptual preference, artistic superiority, listener agreement, external peer approval or calibrated measurement. Those require different study designs and remain explicitly outside the current approval.
 
 ## Shared analysis path
 
@@ -205,7 +221,7 @@ $$
 \right].
 $$
 
-The raw RMS, peak and crest values pass through the shared 35 ms attack/220 ms release envelope to produce the displayed $\operatorname{RMS}_t$, $\operatorname{Peak}_t$ and $\operatorname{Crest}_t$; the zero-crossing fraction is current-window data. RMS and zero-crossing rate are part of the low-level feature vocabulary documented by Geoffroy Peeters in [“A Large Set of Audio Features for Sound Description”](https://articles.ircam.fr/full_list.html). AV/01's crest factor is explicitly the waveform sample-peak-to-RMS ratio above; it is not Peeters's spectral crest descriptor.
+The raw RMS, peak and crest values pass through the shared 35 ms attack/220 ms release envelope to produce the displayed $\operatorname{RMS}_t$, $\operatorname{Peak}_t$ and $\operatorname{Crest}_t$; the zero-crossing fraction is current-window data. RMS and zero-crossing rate are part of the low-level feature vocabulary documented by Geoffroy Peeters in [“A Large Set of Audio Features for Sound Description”](https://discussion.forum.ircam.fr/uploads/default/original/1X/ffa6a82f823873f864681994c271fb157e41a627.pdf). AV/01's crest factor is explicitly the waveform sample-peak-to-RMS ratio above; it is not Peeters's spectral crest descriptor.
 
 AV/01 also reports a floor-bounded level from the smoothed RMS:
 
@@ -273,7 +289,9 @@ $$
 
 Only $R_+[\ell]=\max(0,R[\ell])$ is retained.
 
-The estimate refreshes every 250 ms. Correlations below 0.18 produce no candidate. Otherwise, the shortest lag within 96% of the strongest positive peak is preferred. A fast fractional period can be split between adjacent 50 Hz lag bins while an integer subharmonic aligns exactly—for example, 180 BPM spans about 16.67 frames while its 60 BPM third subharmonic spans exactly 50. To avoid silently reporting that grid artefact as the only answer, AV/01 also accepts the locally strongest bin around an integer divisor of the winning lag when that local peak retains at least 55% of the winning correlation. The selected lag is refined with three-point parabolic interpolation. Both percentages are operational candidate-selection thresholds, not perceptual or music-theory constants. The BPM-equivalent display is
+The periodicity buffer receives the smoothed $O_t$, while the event gate observes the unsmoothed adaptive target $O_t^{\mathrm{raw}}$. An armed detector marks a **transient candidate** when $O_t^{\mathrm{raw}}\ge0.28$ and rises more than 8% over its previous value. It then disarms until $O_t^{\mathrm{raw}}\le0.14$, so one attack cannot be counted repeatedly while it rises, without forcing the 220 ms display-release envelope to decay between fast events. At least four separated candidates must remain inside the rolling history before AV/01 exposes any periodicity candidate. This rejects mathematically periodic low-level modulation that has no separated transient sequence. The thresholds and count are operational false-positive controls, not claims that a candidate is a played note, percussion hit or beat.
+
+The estimate refreshes every 250 ms. Correlations below 0.18 produce no candidate. Otherwise, the shortest lag within 96% of the strongest positive peak is preferred. A fast fractional period can be split between adjacent 50 Hz lag bins while an integer subharmonic aligns exactly—for example, 180 BPM spans about 16.67 frames while its 60 BPM third subharmonic spans exactly 50. To avoid silently reporting that grid artefact as the only answer, AV/01 also accepts the locally strongest bin around an integer divisor of the winning lag when that local peak retains at least 55% of the winning correlation. The selected lag is refined with three-point parabolic interpolation. These percentages, the transient trigger/re-arm thresholds and the four-candidate minimum are operational candidate-selection rules, not perceptual or music-theory constants. The BPM-equivalent display is
 
 $$
 P_{\mathrm{BPM}}=\frac{60\cdot 50}{\ell_{\mathrm{refined}}}.
@@ -287,7 +305,7 @@ $$
 \right).
 $$
 
-Visual phase is anchored only when the onset value reaches 0.28 and rises at least 8% over the previous value.
+Visual phase is anchored to the most recent transient candidate.
 
 The score is a bounded engineering display of selected autocorrelation strength and history coverage. It is not a probability, calibrated confidence interval or estimate of correctness.
 
@@ -347,7 +365,7 @@ AV/01 stops at the matrix. It does not apply Foote's later checkerboard novelty 
 | Waveform display | 256 block means | Drawn from the current 4096-sample mono window |
 | Chroma | 12 bins, 55 Hz–5 kHz | 12-TET, A4 = 440 Hz, octave folded |
 | Flux baseline rise/fall | 0.9 / 2.4 s | Adaptive reference for onset strength |
-| Rhythm history | 50 Hz, up to 8 s | Minimum 2.5 s evidence; 50–200 BPM-equivalent range |
+| Rhythm history | 50 Hz, up to 8 s | Minimum 2.5 s and four separated transient candidates; 0.28 trigger / 0.14 re-arm; 50–200 BPM-equivalent range |
 | Rhythm refresh | 250 ms | Candidate update, not beat scheduling |
 | Similarity history | 64 frames at 8 Hz | Up to 8 s; scalar recurrence excludes the newest 2 s |
 | Silence threshold | -58 dBFS | Wakes at -52 dBFS; 450 ms hold before silence |
@@ -363,7 +381,7 @@ The Web Audio specification requires `AnalyserNode` time-domain data to be downm
 
 ### Microphone processing
 
-AV/01 requests `echoCancellation: false`, `noiseSuppression: false`, `autoGainControl: false`, two channels, 48 kHz and 24-bit samples where supported. These are constraints, not guarantees. The [Media Capture and Streams specification](https://www.w3.org/TR/mediacapture-streams/) allows browser/device negotiation and processing. AV/01 reports the active track's actual settings when the browser exposes them, but the signal may still be downmixed, resampled, filtered, gain-controlled or otherwise altered before it reaches Web Audio.
+AV/01 requests `echoCancellation: false`, `noiseSuppression: false`, `autoGainControl: false`, two channels, 48 kHz and 24-bit samples where supported. These are constraints, not guarantees. The [Media Capture and Streams specification](https://www.w3.org/TR/mediacapture-streams/) allows browser/device negotiation and processing. AV/01 reports the active track's browser-reported negotiated settings when they are exposed, but those target values can differ from measured performance and the signal may still be downmixed, resampled, filtered, gain-controlled or otherwise altered before it reaches Web Audio.
 
 For local files, AV/01 uses two browser paths and labels them separately. A decoded `AudioBuffer` is used for the overview waveform, duration and memory checks; its displayed sample rate and channel count describe that overview decode only. Measured playback reaches the analysis graph through `HTMLMediaElement` → `MediaElementAudioSourceNode` → `AnalyserNode`, and the science method line reports the analyser's `AudioContext` sample rate. `decodeAudioData()` resamples to its context rate, and media playback can also be resampled by the browser, so neither value is presented as the file's original encoded sample rate. The analyser exposes mono time- and frequency-domain arrays even when the decoded overview has multiple channels.
 
@@ -387,10 +405,10 @@ The following statuses summarize the recorded [release-candidate evidence](VALID
 
 | Gate ID | Gate | What a pass would establish | Status |
 | --- | --- | --- | --- |
-| `AV01-VAL-001` | Deterministic unit fixtures | ERB transforms, pitch-class folding, entropy, periodicity and similarity match controlled numerical expectations | Pass · 27/27 tests |
-| `AV01-VAL-002` | Signal-family fixtures | Sine, impulse, silence, octave pairs, periodic pulses and repeated spectral shapes drive the intended descriptors without NaN/Infinity | Pass · nine deterministic browser fixtures |
+| `AV01-VAL-001` | Deterministic unit fixtures | ERB transforms, pitch-class folding, entropy, periodicity and similarity match controlled numerical expectations | Pass · 34/34 tests |
+| `AV01-VAL-002` | Signal-family fixtures | Browser sines, silent intervals, octave pairs, transient trains and repeated spectral shapes—plus unit-level impulse and silence controls—drive the intended descriptors without NaN/Infinity | Pass · nine deterministic browser fixtures plus unit controls |
 | `AV01-VAL-003` | Scene-contract routing | Each scene consumes its declared primary representation and exposes the stated limitation | Pass · WebGL isolation tests and Canvas contract review |
-| `AV01-VAL-004` | Browser integration | The tested path reports coherent sample rate, FFT size, source provenance and renderer state | Partial · local file, Canvas 2D and WebGL 2 pass; live capture not exercised |
+| `AV01-VAL-004` | Browser integration | The tested path reports coherent sample rate, FFT size, source provenance and renderer state | Partial · 3/3 Chromium end-to-end gates plus recorded Canvas 2D and WebGL 2 local-file paths pass; live capture not exercised |
 | `AV01-VAL-005` | Reset/seek/source lifecycle | Stateful rhythm and similarity history reset instead of leaking across discontinuities or sources | Pass · source, stop, replay and export restoration |
 | `AV01-VAL-006` | Export provenance | Preview and recording use the same measured feature frames and scene contract | Pass · full 1280 × 720 WebGL WebM render |
 | `AV01-VAL-007` | Long-session timing | Nominal feature cadence, hidden-tab behavior and bounded resume steps remain coherent under load | Not completed for this candidate |
@@ -407,7 +425,7 @@ These stable IDs are used by the scene definitions and this document.
 - `w3c-webaudio-1.1` — [W3C Web Audio API Recommendation](https://www.w3.org/TR/2021/REC-webaudio-20210617/), 17 June 2021, paired with the [Web Audio API 1.1 First Public Working Draft](https://www.w3.org/TR/webaudio-1.1/), 5 November 2024. The analyser procedure used by AV/01 appears in both; the 1.1 document remains work in progress.
 - `allen-rabiner-1977` — Jont B. Allen and Lawrence R. Rabiner, “A Unified Approach to Short-Time Fourier Analysis and Synthesis,” *Proceedings of the IEEE* 65(11), 1558–1564, 1977. [DOI 10.1109/PROC.1977.10770](https://doi.org/10.1109/PROC.1977.10770).
 - `glasberg-moore-1990` — Brian R. Glasberg and Brian C. J. Moore, “Derivation of Auditory Filter Shapes from Notched-Noise Data,” *Hearing Research* 47(1–2), 103–138, 1990. [DOI 10.1016/0378-5955(90)90170-T](https://doi.org/10.1016/0378-5955(90)90170-T).
-- `peeters-2004` — Geoffroy Peeters, “A Large Set of Audio Features for Sound Description (Similarity and Classification) in the CUIDADO Project,” IRCAM–Centre Pompidou Technical Report, version 1.0, 2004. [Official IRCAM publication index](https://articles.ircam.fr/full_list.html).
+- `peeters-2004` — Geoffroy Peeters, “A Large Set of Audio Features for Sound Description (Similarity and Classification) in the CUIDADO Project,” IRCAM–Centre Pompidou Technical Report, version 1.0, 2004. [Official IRCAM-hosted report PDF](https://discussion.forum.ircam.fr/uploads/default/original/1X/ffa6a82f823873f864681994c271fb157e41a627.pdf).
 - `bartsch-wakefield-2001` — Mark A. Bartsch and Gregory H. Wakefield, “To Catch a Chorus: Using Chroma-Based Representations for Audio Thumbnailing,” *IEEE Workshop on Applications of Signal Processing to Audio and Acoustics*, 15–18, 2001. [DOI 10.1109/ASPAA.2001.969531](https://doi.org/10.1109/ASPAA.2001.969531).
 - `gomez-2006` — Emilia Gómez, “Tonal Description of Polyphonic Audio for Music Content Processing,” *INFORMS Journal on Computing* 18(3), 294–304, 2006. [DOI 10.1287/ijoc.1040.0126](https://doi.org/10.1287/ijoc.1040.0126).
 - `bello-2005` — Juan Pablo Bello, Laurent Daudet, Samer Abdallah, Chris Duxbury, Mike Davies and Mark B. Sandler, “A Tutorial on Onset Detection in Music Signals,” *IEEE Transactions on Speech and Audio Processing* 13(5), 1035–1047, 2005. [DOI 10.1109/TSA.2005.851998](https://doi.org/10.1109/TSA.2005.851998).

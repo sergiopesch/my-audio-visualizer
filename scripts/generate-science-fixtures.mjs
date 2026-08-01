@@ -1,10 +1,15 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 const SAMPLE_RATE = 48_000;
 const DEFAULT_OUTPUT = "output/science-fixtures";
-const outputDirectory = resolve(process.argv[2] ?? DEFAULT_OUTPUT);
+const CHECK_MODE = process.argv.includes("--check");
+const outputArgument = process.argv.slice(2).find((argument) => argument !== "--check");
+const outputDirectory = CHECK_MODE
+  ? mkdtempSync(join(tmpdir(), "av01-science-fixtures-"))
+  : resolve(outputArgument ?? DEFAULT_OUTPUT);
 const fixtures = [];
 
 function clampSample(value) {
@@ -184,4 +189,24 @@ writeFileSync(
   `${JSON.stringify(manifest, null, 2)}\n`,
 );
 
-console.log(`Generated ${fixtures.length} deterministic fixtures in ${outputDirectory}`);
+if (CHECK_MODE) {
+  const validation = readFileSync(resolve("docs/VALIDATION.md"), "utf8");
+  const problems = [];
+  for (const fixture of fixtures) {
+    const escapedFile = fixture.file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const documented = validation.match(
+      new RegExp("\\| `" + escapedFile + "` \\| `([a-f0-9]{64})` \\|"),
+    )?.[1];
+    if (!documented) problems.push(`${fixture.file}: missing from docs/VALIDATION.md`);
+    else if (documented !== fixture.sha256) {
+      problems.push(`${fixture.file}: generated ${fixture.sha256}, documented ${documented}`);
+    }
+  }
+  rmSync(outputDirectory, { recursive: true, force: true });
+  if (problems.length > 0) {
+    throw new Error(`Science fixture verification failed:\n${problems.join("\n")}`);
+  }
+  console.log(`Verified ${fixtures.length} deterministic fixture hashes against docs/VALIDATION.md`);
+} else {
+  console.log(`Generated ${fixtures.length} deterministic fixtures in ${outputDirectory}`);
+}

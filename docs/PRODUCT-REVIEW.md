@@ -15,7 +15,7 @@ This review tells the product story. [The scientific contract and provenance](SC
 - The literal beginning: Audio Visualizer commit [`7305457`](https://github.com/sergiopesch/my-audio-visualizer/commit/73054575ebad1975cd8b4afd683da361af060993)
 - The finished original release: [`v0.1.0-original`](https://github.com/sergiopesch/my-audio-visualizer/tree/v0.1.0-original)
 - The final pre-AV/01 baseline: Audio Visualizer commit [`065e80f`](https://github.com/sergiopesch/my-audio-visualizer/commit/065e80f)
-- The ThorstenClip baseline reviewed for this rebuild: commit [`f7127b2`](https://github.com/sergiopesch/ThorstenClip/commit/f7127b2)
+- The ThorstenClip baseline reviewed for this rebuild: commit `f7127b2` in my private working repository
 
 ## The first experiment
 
@@ -117,7 +117,7 @@ I also name the boundaries. The level is normalized digital dBFS, not LUFS or ac
 
 ### Auditory Field · `AV01-SCI-001`
 
-A short-time spectrum grouped into 24 ERB-rate-spaced triangular regions. It shows where spectral energy sits now; it does not recognize sources or instruments or model an individual listener.
+A short-time spectrum grouped into 24 ERB-rate-spaced triangular regions. It shows how RMS-like spectral magnitude varies across those regions now; it does not recognize sources or instruments or model an individual listener.
 
 ### Tonal Orbit · `AV01-SCI-002`
 

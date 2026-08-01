@@ -5,6 +5,9 @@ export const RECURRENCE_EXCLUSION_SECONDS = 2;
 export const RECURRENCE_EXCLUSION_FRAMES =
   SELF_SIMILARITY_RATE_HZ * RECURRENCE_EXCLUSION_SECONDS;
 export const RHYTHM_SAMPLE_RATE_HZ = 50;
+export const RHYTHM_MIN_TRANSIENT_CANDIDATES = 4;
+export const RHYTHM_TRANSIENT_TRIGGER = 0.28;
+export const RHYTHM_TRANSIENT_REARM = 0.14;
 
 export const PITCH_CLASS_NAMES = [
   "C",
@@ -102,6 +105,8 @@ export interface RhythmEstimate {
   readonly periodicityEvidence: number;
   readonly pulsePhase: number;
   readonly evidenceSeconds: number;
+  /** Hysteretically separated raw-target candidates retained in the rolling history. */
+  readonly transientCandidateCount: number;
 }
 
 /**
@@ -111,6 +116,7 @@ export interface RhythmEstimate {
  */
 export class RhythmPeriodicityTracker {
   private readonly values: Float32Array;
+  private readonly transientCandidates: Uint8Array;
   private readonly correlations: Float32Array;
   private head = -1;
   private count = 0;
@@ -118,7 +124,10 @@ export class RhythmPeriodicityTracker {
   private estimateAccumulatorSeconds = 0;
   private elapsedSeconds = 0;
   private lastCandidateSeconds = Number.NaN;
-  private previousOnset = 0;
+  private previousTransientEvidence = 0;
+  private transientDetectorArmed = true;
+  private pendingTransientCandidate = false;
+  private transientCandidateCount = 0;
   private periodicityBpm = 0;
   private periodicitySeconds = 0;
   private periodicityEvidence = 0;
@@ -128,18 +137,32 @@ export class RhythmPeriodicityTracker {
     historySeconds = 8,
   ) {
     this.values = new Float32Array(Math.max(64, Math.round(sampleRateHz * historySeconds)));
+    this.transientCandidates = new Uint8Array(this.values.length);
     this.correlations = new Float32Array(Math.round((sampleRateHz * 60) / 50) + 1);
   }
 
-  update(onsetStrength: number, deltaSeconds: number): RhythmEstimate {
+  update(
+    onsetStrength: number,
+    deltaSeconds: number,
+    transientEvidence = onsetStrength,
+  ): RhythmEstimate {
     const safeDelta = Number.isFinite(deltaSeconds) ? Math.max(0, deltaSeconds) : 0;
     const onset = clampUnit(onsetStrength);
+    const transient = clampUnit(transientEvidence);
     this.elapsedSeconds += safeDelta;
 
-    if (onset >= 0.28 && onset > this.previousOnset * 1.08) {
+    if (
+      this.transientDetectorArmed &&
+      transient >= RHYTHM_TRANSIENT_TRIGGER &&
+      transient > this.previousTransientEvidence * 1.08
+    ) {
       this.lastCandidateSeconds = this.elapsedSeconds;
+      this.pendingTransientCandidate = true;
+      this.transientDetectorArmed = false;
+    } else if (!this.transientDetectorArmed && transient <= RHYTHM_TRANSIENT_REARM) {
+      this.transientDetectorArmed = true;
     }
-    this.previousOnset = onset;
+    this.previousTransientEvidence = transient;
 
     const interval = 1 / this.sampleRateHz;
     this.accumulatorSeconds += safeDelta;
@@ -165,26 +188,39 @@ export class RhythmPeriodicityTracker {
       periodicityEvidence: this.periodicityEvidence,
       pulsePhase: pulsePhase < 0 ? pulsePhase + 1 : pulsePhase,
       evidenceSeconds: this.count / this.sampleRateHz,
+      transientCandidateCount: this.transientCandidateCount,
     };
   }
 
   reset(): void {
     this.values.fill(0);
+    this.transientCandidates.fill(0);
     this.head = -1;
     this.count = 0;
     this.accumulatorSeconds = 0;
     this.estimateAccumulatorSeconds = 0;
     this.elapsedSeconds = 0;
     this.lastCandidateSeconds = Number.NaN;
-    this.previousOnset = 0;
+    this.previousTransientEvidence = 0;
+    this.transientDetectorArmed = true;
+    this.pendingTransientCandidate = false;
+    this.transientCandidateCount = 0;
     this.periodicityBpm = 0;
     this.periodicitySeconds = 0;
     this.periodicityEvidence = 0;
   }
 
   private push(value: number): void {
-    this.head = (this.head + 1) % this.values.length;
+    const nextHead = (this.head + 1) % this.values.length;
+    if (this.count === this.values.length) {
+      this.transientCandidateCount -= this.transientCandidates[nextHead];
+    }
+    this.head = nextHead;
     this.values[this.head] = value;
+    const candidate = this.pendingTransientCandidate ? 1 : 0;
+    this.transientCandidates[this.head] = candidate;
+    this.transientCandidateCount += candidate;
+    this.pendingTransientCandidate = false;
     this.count = Math.min(this.values.length, this.count + 1);
   }
 
@@ -196,6 +232,17 @@ export class RhythmPeriodicityTracker {
   private estimate(): void {
     const minimumEvidence = Math.round(this.sampleRateHz * 2.5);
     if (this.count < minimumEvidence) {
+      this.periodicityBpm = 0;
+      this.periodicitySeconds = 0;
+      this.periodicityEvidence = 0;
+      return;
+    }
+
+    // Autocorrelation can find periodic numerical modulation even when the
+    // envelope contains no separated transient sequence. Four hysteretically
+    // separated candidates are the minimum evidence needed to expose a pulse
+    // candidate; this is an operational false-positive guard, not a beat claim.
+    if (this.transientCandidateCount < RHYTHM_MIN_TRANSIENT_CANDIDATES) {
       this.periodicityBpm = 0;
       this.periodicitySeconds = 0;
       this.periodicityEvidence = 0;

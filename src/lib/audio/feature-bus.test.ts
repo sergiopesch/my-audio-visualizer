@@ -130,6 +130,8 @@ describe("AudioFeatureBus auditory bands", () => {
     expect(low.rmsRaw).toBeCloseTo(high.rmsRaw, 6);
     expect(low.rmsRaw).toBeCloseTo(0.5 / Math.SQRT2, 5);
     expect(high.spectralCentroidHz).toBeGreaterThan(low.spectralCentroidHz * 10);
+    expect(low.spectralRolloffHz).toBeCloseTo(32 * BIN_HZ, 6);
+    expect(high.spectralRolloffHz).toBeCloseTo(512 * BIN_HZ, 6);
     expect(high.highFrequencyRatio).toBeGreaterThan(0.99);
     expect(low.highFrequencyRatio).toBeLessThan(0.01);
     expect(maximumIndex(high.bandsRaw)).toBeGreaterThan(maximumIndex(low.bandsRaw));
@@ -147,6 +149,7 @@ describe("AudioFeatureBus temporal measurements", () => {
     expect(sine.peakRaw).toBeCloseTo(0.5, 5);
     expect(sine.crestFactorRaw).toBeCloseTo(Math.SQRT2, 4);
     expect(sine.levelDbFs).toBeCloseTo(20 * Math.log10(0.5 / Math.SQRT2), 4);
+    expect(sine.zeroCrossingRate).toBeCloseTo(63 / (FFT_SIZE - 1), 8);
 
     analyser.setSquare(32, 0.5);
     const square = bus.update(20);
@@ -254,6 +257,62 @@ describe("AudioFeatureBus onset response", () => {
     expect(settled).toBeLessThan(0.01);
     expect(changed).toBeGreaterThan(0.8);
   });
+
+  it.each([
+    { bpm: 120, pulseWidthFrames: 5 },
+    { bpm: 200, pulseWidthFrames: 1 },
+  ])(
+    "preserves a $bpm BPM-equivalent candidate through production onset smoothing",
+    ({ bpm, pulseWidthFrames }) => {
+      const analyser = new FakeAnalyser();
+      const bus = createBus(analyser, { attackMs: 35, releaseMs: 220 });
+      const frameSeconds = 0.02;
+      const periodSeconds = 60 / bpm;
+      let nextPulseSeconds = 0.5;
+      let remainingPulseFrames = 0;
+      bus.update(0);
+
+      for (let frame = 1; frame <= 500; frame += 1) {
+        const timeSeconds = frame * frameSeconds;
+        if (timeSeconds + frameSeconds * 0.5 >= nextPulseSeconds) {
+          nextPulseSeconds += periodSeconds;
+          remainingPulseFrames = pulseWidthFrames;
+        }
+        if (remainingPulseFrames > 0) {
+          analyser.setSpectrumBin(32, 0.7);
+          remainingPulseFrames -= 1;
+        } else {
+          analyser.clear();
+        }
+        bus.update(timeSeconds * 1_000);
+      }
+
+      expect(Math.abs(bus.frame.periodicityBpm - bpm)).toBeLessThan(3);
+      expect(bus.frame.periodicityEvidence).toBeGreaterThan(0.5);
+      expect(bus.frame.transientCandidateCount).toBeGreaterThanOrEqual(4);
+    },
+  );
+
+  it("does not expose periodicity for a sustained stationary spectrum", () => {
+    const analyser = new FakeAnalyser();
+    const bus = createBus(analyser, { attackMs: 35, releaseMs: 220 });
+    bus.update(0);
+    analyser.setSine(512, 0.7);
+    let maximumCandidateCount = 0;
+    let maximumBpm = 0;
+    let maximumEvidence = 0;
+
+    for (let frame = 1; frame <= 500; frame += 1) {
+      const result = bus.update(frame * 20);
+      maximumCandidateCount = Math.max(maximumCandidateCount, result.transientCandidateCount);
+      maximumBpm = Math.max(maximumBpm, result.periodicityBpm);
+      maximumEvidence = Math.max(maximumEvidence, result.periodicityEvidence);
+    }
+
+    expect(maximumCandidateCount).toBeLessThanOrEqual(1);
+    expect(maximumBpm).toBe(0);
+    expect(maximumEvidence).toBe(0);
+  });
 });
 
 describe("AudioFeatureBus lifecycle and silence", () => {
@@ -285,6 +344,7 @@ describe("AudioFeatureBus lifecycle and silence", () => {
     expect(bus.frame.dominantChroma).toBe(-1);
     expect(bus.frame.selfSimilarityHead).toBe(-1);
     expect(bus.frame.selfSimilarityCount).toBe(0);
+    expect(bus.frame.transientCandidateCount).toBe(0);
     expect(Array.from(bus.frame.waveform).every((value) => value === 0)).toBe(true);
     expect(Array.from(bus.frame.selfSimilarity).every((value) => value === 0)).toBe(true);
   });

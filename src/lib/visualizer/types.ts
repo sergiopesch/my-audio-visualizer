@@ -65,8 +65,8 @@ export const SCENES: readonly SceneDefinition[] = [
     shortName: "Field",
     description: "A current spectrum grouped into 24 ERB-rate-spaced triangular regions.",
     mapping: "24 ERB bands form the field · centroid and rolloff remain explicit markers",
-    representation: "ERB-spaced short-time spectral energy",
-    question: "Where is energy distributed across ERB-rate-spaced frequency regions now?",
+    representation: "ERB-spaced short-time RMS-like spectral magnitude",
+    question: "How does RMS-like spectral magnitude vary across ERB-rate-spaced regions now?",
     limitation: "It is not a source separator, instrument detector, or model of hearing loss.",
     primaryFeatures: [
       "bands",
@@ -121,6 +121,7 @@ export const SCENES: readonly SceneDefinition[] = [
       "periodicityEvidence",
       "pulsePhase",
       "rhythmEvidenceSeconds",
+      "transientCandidateCount",
     ],
     evidence: ["bello-2005", "dixon-2006", "scheirer-1998"],
   },

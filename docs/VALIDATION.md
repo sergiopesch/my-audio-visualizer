@@ -10,11 +10,12 @@ Recorded environment: macOS 26.6 (`arm64`), Codex in-app browser runtime (browse
 
 ## Automated evidence
 
-The release suite currently contains 27 deterministic tests across three files:
+The release suite currently contains 34 deterministic tests across three unit-test files, plus three Chromium end-to-end tests:
 
-- 11 feature-bus tests for ERB layout, equal-RMS spectral separation, waveform descriptors, over-full-scale samples, polarity, chroma, tone-to-silence clearing, onset response, state identity and reset;
-- 12 scientific-analysis tests for ERB transforms, pitch-class folding, entropy, 90/120/180 BPM-equivalent periodicity, an aperiodic control, constant-envelope rejection and rolling recurrence; and
+- 14 feature-bus tests for ERB layout, equal-RMS spectral separation, waveform descriptors, over-full-scale samples, polarity, chroma, tone-to-silence clearing, onset response, production-smoothed 120/200 BPM-equivalent periodicity, sustained-spectrum rejection, state identity and reset;
+- 16 scientific-analysis tests for ERB transforms, pitch-class folding, entropy, production-smoothed 90/120/180/200 BPM-equivalent periodicity, an aperiodic control, constant and sub-threshold envelope rejection, one-shot transient hysteresis and rolling recurrence;
 - 4 scene-contract tests for non-overlapping feature ownership, visible limitations, WebGL evidence isolation and the absence of autonomous clocks, noise and grain.
+- 3 Chromium end-to-end tests for hydration/provenance/mobile overflow, the sustained-tone negative control, all five scene routes, stop/reset and the periodic-versus-jittered transient control.
 
 The required release commands are:
 
@@ -22,8 +23,9 @@ The required release commands are:
 npm run type-check
 npm run lint -- --max-warnings=0
 npm test
-npm run build
+npm run science:fixtures:check
 npm run audit:ci
+npm run test:e2e
 ```
 
 ## Deterministic browser fixtures
@@ -51,7 +53,7 @@ The browser run exercised the real file decode, `AnalyserNode`, feature clock, s
 | Auditory Field | 375 Hz and 6 kHz sine waves with equal generated RMS | Levels `-12.033` and `-12.041` dBFS; centroids `375` and `6000` Hz; >3 kHz power `0%` and `100%` | Pass: level is held while spectral position changes |
 | Tonal Orbit | A3 at 220 Hz and A4 at 440 Hz | Both report strongest class `A`; concentrations about `54.5%` and `73.2%`; levels differ by about `0.002` dB | Pass: octave folds while the display avoids note/octave inference |
 | Temporal Scope | 375 Hz reference and polarity-inverted copy | Reference/inverted: level `-12.041`/`-12.030` dBFS, peak `0.3536`/`0.3536`, ZCR `0.0171`/`0.0171`, crest `1.4168`/`1.4265`; the numerical unit fixture verifies every displayed waveform point changes sign | Pass: waveform polarity changes while magnitude descriptors remain invariant within browser-window tolerance |
-| Rhythm Lattice | 15 periodic pulses at 120 BPM-equivalent and 15 jittered pulses | Periodic candidate `119.90` with evidence score about `0.94`; aperiodic control about `0.41` | Pass: repeated onset timing separates from the matched event-count control; the value remains a candidate and the score is not probability |
+| Rhythm Lattice | 15 periodic pulses at 120 BPM-equivalent and 15 jittered pulses | Four fresh Chromium runs: periodic candidate `119.65`–`120.06`, evidence `0.8774`–`0.9221`, 13 retained candidates; matched aperiodic evidence `0.2714`–`0.3534` at the same analysis-history point | Pass: repeated onset timing separates from the matched event-count control; the value remains a candidate and the score is not probability |
 | Recurrence Atlas | level-changed A–B–A sequence and A–B–C control | At the repeated A, recurrence `1.000`; at C, recurrence `0.000`; both final reads used WebGL 2 with 43 populated matrix samples | Pass: level-normalized repeated spectral shape separates from a non-repeating control |
 
 ### The failed control I kept in the story
@@ -59,6 +61,14 @@ The browser run exercised the real file decode, `AnalyserNode`, feature clock, s
 The first recurrence control used differently transposed but broadly similar two-tone shapes. It produced `1.00` for A–B–A and approximately `0.96` for the supposed A–B–C control. That was not a pass: the control did not isolate the variable the scene measures.
 
 I replaced it with four well-separated two-tone ERB shapes—A `[187.5, 375]`, B `[750, 1500]`, C `[3000, 6000]`, D `[9000, 14000]` Hz—and reran the experiment. The corrected A–B–A/A–B–C result is the `1.000`/`0.000` pair above. The failure is recorded because it changed the test, not because it was convenient to hide.
+
+### The false rhythm candidate the release audit caught
+
+A fresh browser replay of the sustained 6 kHz control exposed `200` BPM-equivalent with about `0.48` evidence even though the maximum observed onset strength was below the declared `0.28` transient threshold. Autocorrelation had found weak periodic numerical modulation, not a credible event sequence.
+
+The first attempted guard was also rejected: it counted several rising samples from one smooth attack as several candidates. A hysteresis-only revision then coupled re-arming to the displayed 220 ms release envelope and missed wider or faster transient trains. The approved implementation separates those jobs. Autocorrelation receives the smoothed onset envelope; the one-shot candidate gate observes the unsmoothed adaptive flux target, triggers at `0.28`, and re-arms only after that raw target falls to `0.14`. Four separated candidates are required before any periodicity value is exposed.
+
+The committed regression matrix now covers production smoothing at 90, 120, 180 and 200 BPM-equivalent, multiple transient widths, a single smooth attack with a periodic sub-threshold tail, and a full FeatureBus sustained spectrum tracked over ten seconds. The optimized-browser gate reports the sustained 6 kHz tone with at most one candidate and exactly `0.00` BPM / `0.0000` evidence.
 
 ## Runtime, reset and export evidence
 
@@ -74,8 +84,8 @@ I replaced it with four well-separated two-tone ERB shapes—A `[187.5, 375]`, B
 
 | Gate | Status on this candidate | Evidence boundary |
 | --- | --- | --- |
-| `AV01-VAL-001` deterministic numerical fixtures | **Pass** | 27/27 automated tests, including 90/120/180 BPM-equivalent cases and tone-to-silence clearing |
-| `AV01-VAL-002` signal-family fixtures | **Pass** | Nine reproducible WAV fixtures plus matched browser results above |
+| `AV01-VAL-001` deterministic numerical fixtures | **Pass** | 34/34 unit tests, including production-smoothed 90/120/180/200 BPM-equivalent cases, transient-gate adversarial controls and tone-to-silence clearing |
+| `AV01-VAL-002` signal-family fixtures | **Pass** | Nine reproducible WAV fixtures, hash verification and 3/3 optimized Chromium end-to-end gates |
 | `AV01-VAL-003` scene-contract routing | **Pass** | Non-overlapping feature declarations and WebGL block-isolation tests; Canvas routing reviewed against the same contract |
 | `AV01-VAL-004` browser integration | **Partial** | Local-file provenance, decoded rate, FFT/window disclosure, Canvas 2D and WebGL 2 passed in the recorded browser; system capture and microphone permission/settings were not exercised |
 | `AV01-VAL-005` reset/seek/source lifecycle | **Pass** | Reset unit tests plus source, stop, replay-from-end and export restoration checks |

@@ -44,6 +44,7 @@ const INITIAL_TELEMETRY: Telemetry = {
   periodicityEvidence: 0,
   pulsePhase: 0,
   rhythmEvidenceSeconds: 0,
+  transientCandidateCount: 0,
   recurrence: 0,
   similarityCount: 0,
   analysisRateHz: 50,

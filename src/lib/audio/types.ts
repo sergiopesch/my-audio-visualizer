@@ -79,6 +79,8 @@ export interface FeatureFrame {
   readonly periodicityEvidence: number;
   readonly pulsePhase: number;
   readonly rhythmEvidenceSeconds: number;
+  /** Hysteretically separated raw-target candidates retained in the rhythm history. */
+  readonly transientCandidateCount: number;
 
   readonly isSilent: boolean;
   readonly silenceDurationSeconds: number;

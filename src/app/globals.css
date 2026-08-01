@@ -1816,7 +1816,8 @@ a {
 
 @media (max-width: 940px) {
   .entry-shell {
-    overflow: visible;
+    overflow-x: clip;
+    overflow-y: visible;
   }
 
   .entry-grid {

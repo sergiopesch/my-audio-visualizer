@@ -41,6 +41,7 @@ export interface Telemetry {
   periodicityEvidence: number;
   pulsePhase: number;
   rhythmEvidenceSeconds: number;
+  transientCandidateCount: number;
   recurrence: number;
   similarityCount: number;
   analysisRateHz: number;
@@ -288,6 +289,7 @@ export function VisualizerCanvas({
           periodicityEvidence: frame.periodicityEvidence,
           pulsePhase: frame.pulsePhase,
           rhythmEvidenceSeconds: frame.rhythmEvidenceSeconds,
+          transientCandidateCount: frame.transientCandidateCount,
           recurrence: frame.recurrence,
           similarityCount: frame.selfSimilarityCount,
           analysisRateHz: frame.analysisRateHz,
@@ -342,6 +344,7 @@ export function VisualizerCanvas({
       canvas.dataset.onsetStrength = frame.onsetStrength.toFixed(4);
       canvas.dataset.periodicityBpm = frame.periodicityBpm.toFixed(2);
       canvas.dataset.periodicityEvidence = frame.periodicityEvidence.toFixed(4);
+      canvas.dataset.transientCandidateCount = String(frame.transientCandidateCount);
       canvas.dataset.chromaConcentration = frame.chromaConcentration.toFixed(4);
       canvas.dataset.dominantChroma = String(frame.dominantChroma);
       canvas.dataset.recurrence = frame.recurrence.toFixed(4);
@@ -585,6 +588,7 @@ export function VisualizerCanvas({
       delete canvas.dataset.onsetStrength;
       delete canvas.dataset.periodicityBpm;
       delete canvas.dataset.periodicityEvidence;
+      delete canvas.dataset.transientCandidateCount;
       delete canvas.dataset.chromaConcentration;
       delete canvas.dataset.dominantChroma;
       delete canvas.dataset.recurrence;

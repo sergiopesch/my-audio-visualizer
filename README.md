@@ -58,6 +58,20 @@ Your audio stays with you. There is no upload service, account or tracking layer
 
 Every scene can be combined with four color systems and three output frames. Sensitivity, intensity, glow and detail remain independent, so the result can become yours rather than a fixed preset. The formulas, timing windows, sources and limitations behind every claim ID live in the [scientific contract](docs/SCIENCE.md).
 
+## The differentiator: representation, not skin
+
+AV/01 is not five cosmetic treatments of one FFT. Each scene owns a non-overlapping evidence family. Automated contract tests enforce the declarations and scan every WebGL scene for cross-scene evidence access; the Canvas fallback is reviewed against the same ownership map. Matched controls then change one signal property at a time:
+
+| Controlled comparison | Representation expected to change | Evidence expected to remain stable |
+| --- | --- | --- |
+| Equal-RMS 375 Hz versus 6 kHz tones | Auditory Field spectral position | Temporal RMS level |
+| A3 versus A4 | Auditory Field position and waveform period | Tonal Orbit's strongest pitch class |
+| A waveform versus its polarity inverse | Temporal Scope waveform sign | Magnitude spectrum, level and crest factor |
+| Periodic versus jittered transient trains with the same event count | Rhythm Lattice periodicity evidence | The existence and count of source events |
+| A–B–A versus A–B–C spectral-shape sequences | Recurrence Atlas off-diagonal similarity | The declared per-frame spectral-shape vocabulary |
+
+That is the scientifically defensible differentiator: five falsifiably different representations, visible methods and explicit limits. The controls demonstrate implementation separation; they do not prove that AV/01 is perceptually superior, peer reviewed or a calibrated measurement instrument.
+
 ## It listens to more than volume
 
 The original visualizer reduced each frame of audio to one peak value. AV/01 keeps the immediacy but gives the sound a larger, more exact vocabulary:
@@ -203,10 +217,11 @@ Browser support is based on capabilities rather than a version number:
 
 ```bash
 npm run type-check
-npm run lint
+npm run lint -- --max-warnings=0
 npm test
-npm run build
+npm run science:fixtures:check
 npm run audit:ci
+npm run test:e2e
 ```
 
 The first AV/01 rebuild was exercised in a real browser across desktop, mobile and short-landscape layouts; WebGL context loss; Canvas 2D fallback; reduced motion; file playback; background-tab recording; and a complete 1280 × 720 VP9/Opus video export. That remains the historical UI/export baseline. The scientific-analysis candidate now has a separate [validation record](docs/VALIDATION.md): deterministic, scene-routing, matched-signal, reset and local-file export gates pass; live-capture integration is partial and the defined long-session gate is still open. These are internal engineering results, not peer review, perceptual validation or metrological approval.

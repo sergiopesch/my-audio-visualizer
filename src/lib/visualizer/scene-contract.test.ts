@@ -17,6 +17,7 @@ const EXPECTED_PRIMARY_FEATURES: Record<SceneId, readonly string[]> = {
     "periodicityEvidence",
     "pulsePhase",
     "rhythmEvidenceSeconds",
+    "transientCandidateCount",
   ],
   contour: [
     "selfSimilarity",

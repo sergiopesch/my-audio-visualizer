@@ -11,6 +11,8 @@
 # Testing
 /coverage
 /.playwright-cli/
+/playwright-report/
+/test-results/
 /output/*
 !/output/playwright/
 /output/playwright/*
