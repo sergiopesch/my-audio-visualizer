@@ -7,6 +7,20 @@ export type AudioSourceMode = "none" | "file" | "system" | "microphone";
 /** Concise compatibility alias used by studio components. */
 export type SourceMode = AudioSourceMode;
 
+export interface AudioCaptureSettings {
+  readonly sampleRate?: number;
+  readonly sampleSize?: number;
+  readonly channelCount?: number;
+  readonly echoCancellation?: boolean;
+  readonly noiseSuppression?: boolean;
+  readonly autoGainControl?: boolean;
+}
+
+export interface AudioSourceDetails {
+  readonly sampleRate: number;
+  readonly channelCount: number;
+}
+
 export type AudioEngineStatus =
   | "idle"
   | "loading"
@@ -32,6 +46,10 @@ export interface UseAudioEngineResult {
   readonly error: string | null;
   /** The raw, audio-only system or microphone input stream. */
   readonly liveStream: MediaStream | null;
+  /** Settings the active capture track actually reports, not merely those requested. */
+  readonly captureSettings: AudioCaptureSettings | null;
+  /** Decoded AudioBuffer shape for files, or reported/fallback graph shape for live capture. */
+  readonly sourceDetails: AudioSourceDetails | null;
   readonly isLive: boolean;
   /** Web Audio's recording output. This is intentionally not HTMLMediaElement.captureStream(). */
   readonly captureStream: MediaStream | null;
@@ -61,6 +79,8 @@ interface EngineState {
   waveformPeaks: number[];
   error: string | null;
   liveStream: MediaStream | null;
+  captureSettings: AudioCaptureSettings | null;
+  sourceDetails: AudioSourceDetails | null;
   captureStream: MediaStream | null;
 }
 
@@ -99,6 +119,8 @@ function createInitialState(): EngineState {
     waveformPeaks: EMPTY_WAVEFORM,
     error: null,
     liveStream: null,
+    captureSettings: null,
+    sourceDetails: null,
     captureStream: null,
   };
 }
@@ -463,7 +485,10 @@ export function useAudioEngine(): UseAudioEngineResult {
       analyser.fftSize = FFT_SIZE;
       analyser.minDecibels = -110;
       analyser.maxDecibels = -10;
-      analyser.smoothingTimeConstant = 0.72;
+      // FeatureBus owns the documented attack/release smoothing. Leaving the
+      // AnalyserNode unsmoothed keeps spectral change measurements causal and
+      // avoids an undocumented second temporal filter.
+      analyser.smoothingTimeConstant = 0;
       analyserRef.current = analyser;
     }
 
@@ -690,6 +715,8 @@ export function useAudioEngine(): UseAudioEngineResult {
         isPlaying: false,
         error: null,
         liveStream: null,
+        captureSettings: null,
+        sourceDetails: null,
       });
     },
     [
@@ -839,6 +866,11 @@ export function useAudioEngine(): UseAudioEngineResult {
           waveformPeaks,
           error: null,
           liveStream: null,
+          captureSettings: null,
+          sourceDetails: {
+            sampleRate: decodedAudio.sampleRate,
+            channelCount: decodedAudio.numberOfChannels,
+          },
         });
         return true;
       } catch (error) {
@@ -921,6 +953,7 @@ export function useAudioEngine(): UseAudioEngineResult {
         }
 
         audioOnlyStream = new MediaStream(audioTracks);
+        const actualTrackSettings = audioTracks[0]?.getSettings();
         // Display capture usually requires video. It is no longer needed after
         // the audio tracks have been safely copied into an audio-only stream.
         requestedStream.getVideoTracks().forEach((track) => track.stop());
@@ -980,6 +1013,20 @@ export function useAudioEngine(): UseAudioEngineResult {
           waveformPeaks: EMPTY_WAVEFORM,
           error: null,
           liveStream: audioOnlyStream,
+          captureSettings: actualTrackSettings
+            ? {
+                sampleRate: actualTrackSettings.sampleRate,
+                sampleSize: actualTrackSettings.sampleSize,
+                channelCount: actualTrackSettings.channelCount,
+                echoCancellation: actualTrackSettings.echoCancellation,
+                noiseSuppression: actualTrackSettings.noiseSuppression,
+                autoGainControl: actualTrackSettings.autoGainControl,
+              }
+            : null,
+          sourceDetails: {
+            sampleRate: actualTrackSettings?.sampleRate ?? context.sampleRate,
+            channelCount: actualTrackSettings?.channelCount ?? audioTracks.length,
+          },
         });
         return true;
       } catch (error) {
@@ -1062,7 +1109,10 @@ export function useAudioEngine(): UseAudioEngineResult {
       navigator.mediaDevices.getUserMedia({
         video: false,
         audio: {
-          echoCancellation: true,
+          // Ask for the least processed signal available. Browsers and devices
+          // may still alter it, so the reported track settings are surfaced in
+          // the science panel rather than assuming these constraints succeeded.
+          echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
           channelCount: { ideal: 2 },
@@ -1240,6 +1290,8 @@ export function useAudioEngine(): UseAudioEngineResult {
         isPlaying: false,
         error: null,
         liveStream: null,
+        captureSettings: null,
+        sourceDetails: null,
       });
       return;
     }
@@ -1394,6 +1446,8 @@ export function useAudioEngine(): UseAudioEngineResult {
     waveformPeaks: state.waveformPeaks,
     error: state.error,
     liveStream: state.liveStream,
+    captureSettings: state.captureSettings,
+    sourceDetails: state.sourceDetails,
     isLive,
     captureStream: state.captureStream,
     loadFile,

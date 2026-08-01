@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 import type { SourceMode } from "@/hooks/useAudioEngine";
+import { PITCH_CLASS_NAMES } from "@/lib/audio/scientific-analysis";
 import { findPalette, findScene, type VisualSettings } from "@/lib/visualizer/types";
 import type { Telemetry } from "./VisualizerCanvas";
 
@@ -21,6 +22,48 @@ function sourceLabel(mode: SourceMode): string {
   return "LOCAL FILE";
 }
 
+function sceneReadouts(
+  scene: VisualSettings["scene"],
+  telemetry: Telemetry,
+): readonly [string, string][] {
+  if (scene === "field") {
+    return [
+      ["CENTROID", `${Math.round(telemetry.centroidHz)} Hz`],
+      ["ROLLOFF", `${Math.round(telemetry.rolloffHz)} Hz`],
+    ];
+  }
+  if (scene === "orbit") {
+    return [
+      [
+        "STRONGEST CLASS",
+        telemetry.dominantChroma >= 0
+          ? PITCH_CLASS_NAMES[telemetry.dominantChroma] ?? "—"
+          : "—",
+      ],
+      ["CONCENTRATION", `${Math.round(telemetry.chromaConcentration * 100)}%`],
+    ];
+  }
+  if (scene === "trace") {
+    return [
+      ["RMS LEVEL", `${telemetry.levelDbFs.toFixed(1)} dBFS`],
+      ["CREST", `${telemetry.crestFactor.toFixed(2)}×`],
+    ];
+  }
+  if (scene === "lattice") {
+    return [
+      ["ONSET", `${Math.round(telemetry.onsetStrength * 100)}%`],
+      [
+        "PERIOD",
+        telemetry.periodicityBpm > 0 ? `${telemetry.periodicityBpm.toFixed(1)} BPM-eq.` : "—",
+      ],
+    ];
+  }
+  return [
+    ["RECURRENCE", `${Math.round(telemetry.recurrence * 100)}%`],
+    ["HISTORY", `${(telemetry.similarityCount / 8).toFixed(1)} s`],
+  ];
+}
+
 export function StudioStage({
   containerRef,
   visualizer,
@@ -33,6 +76,7 @@ export function StudioStage({
   const scene = findScene(settings.scene);
   const palette = findPalette(settings.palette);
   const meterLevel = Math.min(1, telemetry.energy * settings.sensitivity * 2.1);
+  const readouts = sceneReadouts(settings.scene, telemetry);
 
   return (
     <section className={`studio-stage aspect-${settings.aspect}`} ref={containerRef} aria-label="Visualizer stage">
@@ -64,14 +108,12 @@ export function StudioStage({
           ))}
         </div>
         <div className="stage-readouts" aria-label="Audio analysis summary">
-          <span>
-            <small>ENERGY</small>
-            {Math.round(telemetry.energy * 100).toString().padStart(2, "0")}
-          </span>
-          <span>
-            <small>CENTROID</small>
-            {Math.round(telemetry.centroidHz)} Hz
-          </span>
+          {readouts.map(([label, value]) => (
+            <span key={label}>
+              <small>{label}</small>
+              {value}
+            </span>
+          ))}
           <span>
             <small>ENGINE</small>
             {telemetry.renderer.toUpperCase()}

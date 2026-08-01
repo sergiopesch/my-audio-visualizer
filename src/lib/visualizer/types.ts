@@ -1,3 +1,5 @@
+import type { FeatureFrame } from "@/lib/audio";
+
 export type SceneId = "field" | "orbit" | "trace" | "lattice" | "contour";
 
 export type PaletteId = "voltage" | "solar" | "tidal" | "infrared";
@@ -9,21 +11,31 @@ export interface VisualSettings {
   palette: PaletteId;
   aspect: AspectId;
   intensity: number;
-  motion: number;
   bloom: number;
   detail: number;
   sensitivity: number;
-  flashSafe: boolean;
+  highlightCompression: boolean;
   seed: number;
 }
 
 export interface SceneDefinition {
   id: SceneId;
   index: number;
+  claimId: `AV01-SCI-00${1 | 2 | 3 | 4 | 5}`;
   name: string;
   shortName: string;
   description: string;
   mapping: string;
+  /** The signal representation shown by this scene, stated without inference. */
+  representation: string;
+  /** The narrow analytical question this representation can answer. */
+  question: string;
+  /** The strongest claim the scene deliberately does not make. */
+  limitation: string;
+  /** FeatureFrame fields that are evidence for this scene. */
+  primaryFeatures: readonly (keyof FeatureFrame)[];
+  /** Stable source IDs resolved in the science documentation. */
+  evidence: readonly string[];
 }
 
 export interface PaletteDefinition {
@@ -48,42 +60,89 @@ export const SCENES: readonly SceneDefinition[] = [
   {
     id: "field",
     index: 0,
-    name: "Spectral Field",
+    claimId: "AV01-SCI-001",
+    name: "Auditory Field",
     shortName: "Field",
-    description: "A liquid light-field carved by timbre and dynamics.",
-    mapping: "Bass bends space · mids form ribbons · air reveals grain",
+    description: "A current spectrum grouped into 24 ERB-rate-spaced triangular regions.",
+    mapping: "24 ERB bands form the field · centroid and rolloff remain explicit markers",
+    representation: "ERB-spaced short-time spectral energy",
+    question: "Where is energy distributed across ERB-rate-spaced frequency regions now?",
+    limitation: "It is not a source separator, instrument detector, or model of hearing loss.",
+    primaryFeatures: [
+      "bands",
+      "spectralCentroidHz",
+      "spectralRolloffHz",
+      "highFrequencyRatio",
+    ],
+    evidence: ["allen-rabiner-1977", "glasberg-moore-1990", "peeters-2004"],
   },
   {
     id: "orbit",
     index: 1,
-    name: "Orbital Bloom",
+    claimId: "AV01-SCI-002",
+    name: "Tonal Orbit",
     shortName: "Orbit",
-    description: "A frequency mandala with transient-driven shockwaves.",
-    mapping: "24 bands shape the bloom · attacks launch rings",
+    description: "Octave-folded pitch-class energy arranged as twelve fixed sectors.",
+    mapping: "12 chroma bins set sector radii · concentration and strongest class are annotated",
+    representation: "Twelve-bin chroma (octave-folded pitch-class energy)",
+    question: "How concentrated is spectral energy among the twelve pitch classes?",
+    limitation: "It does not identify a played note, chord, key, tuning, or octave.",
+    primaryFeatures: ["chroma", "chromaConcentration", "dominantChroma"],
+    evidence: ["bartsch-wakefield-2001", "gomez-2006"],
   },
   {
     id: "trace",
     index: 2,
-    name: "Signal Trace",
+    claimId: "AV01-SCI-003",
+    name: "Temporal Scope",
     shortName: "Trace",
-    description: "An oscilloscope transformed into a luminous sculpture.",
-    mapping: "Waveform draws form · crest controls depth · flux leaves echoes",
+    description: "A direct view of the recent mono time-domain signal and level descriptors.",
+    mapping: "Samples draw the trace · RMS and peak set rails · crest and zero crossings set gauges",
+    representation: "Recent mono waveform with RMS, peak, crest factor, and zero-crossing rate",
+    question: "How is amplitude changing within the current analysis window?",
+    limitation: "It is not calibrated SPL, LUFS, stereo phase, or an analog oscilloscope measurement.",
+    primaryFeatures: ["waveform", "rms", "peak", "crestFactor", "zeroCrossingRate"],
+    evidence: ["peeters-2004", "w3c-webaudio-1.1"],
   },
   {
     id: "lattice",
     index: 3,
-    name: "Pulse Lattice",
+    claimId: "AV01-SCI-004",
+    name: "Rhythm Lattice",
     shortName: "Lattice",
-    description: "The original pixel ripple, rebuilt with real spectral detail.",
-    mapping: "Bands illuminate cells · bass expands · treble fractures edges",
+    description: "Onset change and short-term periodicity shown with a heuristic evidence score.",
+    mapping: "Onset strength excites the core · phase advances the lattice · evidence limits visibility",
+    representation: "Spectral-change onset strength with short-term autocorrelation periodicity",
+    question: "Is the recent onset envelope repeating at a plausible pulse period?",
+    limitation: "It does not assert a beat, downbeat, musical tempo, meter, or perceptual groove.",
+    primaryFeatures: [
+      "onsetStrength",
+      "periodicityBpm",
+      "periodicityEvidence",
+      "pulsePhase",
+      "rhythmEvidenceSeconds",
+    ],
+    evidence: ["bello-2005", "dixon-2006", "scheirer-1998"],
   },
   {
     id: "contour",
     index: 4,
-    name: "Contour Memory",
+    claimId: "AV01-SCI-005",
+    name: "Recurrence Atlas",
     shortName: "Contour",
-    description: "Topographic signal lines that breathe with the track.",
-    mapping: "Energy raises terrain · brightness shifts elevation · beats ripple",
+    description: "A rolling self-similarity matrix of normalized auditory spectral shape.",
+    mapping: "Time runs on both axes · brighter cells are more similar · non-flat shapes identify with themselves on the diagonal",
+    representation: "Cosine self-similarity of level-normalized log ERB-band vectors",
+    question: "When has the recent spectral shape resembled another recent moment?",
+    limitation: "It does not identify song sections, motifs, sources, or structural boundaries.",
+    primaryFeatures: [
+      "selfSimilarity",
+      "selfSimilaritySize",
+      "selfSimilarityHead",
+      "selfSimilarityCount",
+      "recurrence",
+    ],
+    evidence: ["foote-1999", "foote-2000"],
   },
 ] as const;
 
@@ -137,11 +196,10 @@ export const DEFAULT_VISUAL_SETTINGS: VisualSettings = {
   palette: "voltage",
   aspect: "landscape",
   intensity: 0.78,
-  motion: 0.62,
   bloom: 0.58,
   detail: 0.7,
   sensitivity: 1,
-  flashSafe: true,
+  highlightCompression: true,
   seed: 17,
 };
 

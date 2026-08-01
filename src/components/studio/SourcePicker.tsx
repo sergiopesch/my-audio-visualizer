@@ -51,8 +51,9 @@ export function SourcePicker({
             <em>seen.</em>
           </h1>
           <p className="entry-deck">
-            A living canvas that reads rhythm, timbre and texture—not just volume.
-            Every signal stays on your device.
+            Five explicit views of one signal: auditory spectrum, pitch class,
+            waveform, onset-envelope periodicity and recent self-similarity. Every
+            signal stays on your device.
           </p>
 
           <div className="source-stack" aria-label="Choose an audio source">
@@ -107,13 +108,13 @@ export function SourcePicker({
             <div className="preview-registration preview-registration-br" />
             {preview}
             <div className="preview-label preview-label-top">
-              <span>DEMO SIGNAL</span>
+              <span>SYNTHETIC FEATURE PREVIEW</span>
               <span>{telemetry.renderer.toUpperCase()}</span>
             </div>
             <div className="preview-label preview-label-bottom">
               <span>{demoPaused ? "00" : String(Math.round(telemetry.fps)).padStart(2, "0")} FPS</span>
-              <span>{Math.round(telemetry.centroidHz)} HZ CENTROID</span>
-              <span>{telemetry.silent ? "QUIET" : "ACTIVE"}</span>
+              <span>ILLUSTRATIVE · NOT MEASURED</span>
+              <span>{demoPaused ? "HELD" : "ACTIVE"}</span>
             </div>
             <button
               type="button"
@@ -128,8 +129,9 @@ export function SourcePicker({
           <div className="entry-annotation">
             <span>←</span>
             <p>
-              <strong>24 perceptual bands</strong>
-              The canvas separates low-end force, vocal body, transients and air.
+              <strong>Five distinct representations</strong>
+              This preview animates synthetic feature data. Load a real signal to
+              test the documented methods.
             </p>
           </div>
         </div>

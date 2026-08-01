@@ -1010,6 +1010,90 @@ a {
   letter-spacing: 0.13em;
 }
 
+.science-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.science-panel h3 {
+  margin-bottom: 2px;
+}
+
+.science-representation,
+.science-question,
+.science-limitation {
+  margin: 0;
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.science-representation {
+  color: var(--acid);
+}
+
+.science-question {
+  color: var(--paper-dim);
+}
+
+.science-readouts {
+  display: grid;
+  gap: 6px;
+  margin: 2px 0;
+}
+
+.science-readouts div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(239, 241, 223, 0.08);
+}
+
+.science-readouts dt,
+.science-readouts dd {
+  margin: 0;
+  font-size: 7px;
+}
+
+.science-readouts dt {
+  color: var(--muted);
+}
+
+.science-readouts dd {
+  color: var(--paper);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.science-limitation {
+  color: var(--muted);
+}
+
+.science-limitation strong {
+  color: var(--paper-dim);
+  font-weight: 500;
+}
+
+.science-method {
+  display: block;
+  color: var(--muted);
+  font-size: 6px;
+  line-height: 1.55;
+}
+
+.science-link {
+  width: fit-content;
+  color: var(--paper-dim);
+  font-size: 6px;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+}
+
+.science-link:hover {
+  color: var(--acid);
+}
+
 .parameter-stack {
   display: grid;
   gap: 15px;

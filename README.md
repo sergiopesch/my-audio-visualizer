@@ -8,9 +8,9 @@ The first version was one page, one canvas and a small green grid. It was simple
 
 AV/01 is what happened when I stopped treating that idea like an effect and started treating it like an instrument.
 
-It listens for rhythm, timbre, transients, brightness, spectral movement and waveform shape, then turns them into five visual systems that can be played, shaped, captured and recorded in real time.
+It turns short-time spectrum, octave-folded pitch-class energy, waveform dynamics, onset-envelope periodicity and recent spectral recurrence into five visual systems that can be played, shaped, captured and recorded in real time. Those terms are deliberate: AV/01 does not pretend to identify notes, chords, beats, tempo or song sections when the evidence does not support it.
 
-![AV/01 running the Pulse Lattice scene](output/playwright/av01-studio-readme.png)
+![The AV/01 visual instrument showing measured spectral recurrence](output/playwright/av01-studio-readme.jpg)
 
 ## Where it started
 
@@ -25,6 +25,8 @@ I am keeping that first version visible. It is not something I want to erase und
 - [`av01-launch`](https://github.com/sergiopesch/my-audio-visualizer/tree/av01-launch) marks the first complete AV/01 rebuild now living on `main`.
 - [The archived V1 README](docs/history/AUDIO-VISUALIZER-V1.md) preserves the original README text, with only an archival note and its demo-image path adjusted.
 - [From Audio Visualizer to AV/01](docs/PRODUCT-REVIEW.md) explains what changed, what I learned from ThorstenClip and why I rebuilt the system this way.
+- [The scientific contract and provenance](docs/SCIENCE.md) states exactly what each scene computes, what informs it and what it cannot claim.
+- [The release-candidate validation record](docs/VALIDATION.md) publishes the fixtures, measured controls, failures and remaining open gates.
 
 Along the way, I built ThorstenClip to find out how much further this idea could go. It taught me a lot about stage-first design, deeper audio analysis, visual composition and making the final result feel authored instead of decorative.
 
@@ -37,8 +39,8 @@ AV/01 is a browser-native visual instrument for music, voice, instruments and li
 - Open local audio by picker or drag and drop.
 - Capture audio from a shared tab or application.
 - Use a microphone for a room, voice or instrument.
-- Read the signal through 24 perceptual frequency bands and a full set of dynamics and spectral features.
-- Shape five real-time scenes with response, motion, bloom, detail, palette and frame controls.
+- Read the signal through 24 ERB-rate-spaced triangular bands, twelve octave-folded pitch classes, time-domain dynamics, onset-envelope periodicity and rolling spectral self-similarity.
+- Shape five real-time scenes with sensitivity, intensity, glow, detail, palette, frame and visual-comfort controls.
 - Save still frames or record a complete visual performance with audio.
 - Keep the entire process local to the browser.
 
@@ -46,29 +48,29 @@ Your audio stays with you. There is no upload service, account or tracking layer
 
 ## Five visual systems
 
-| Key | Scene | What the sound controls |
-| --- | --- | --- |
-| `1` | **Spectral Field** | Bass bends space, mids form ribbons and high frequencies reveal grain. |
-| `2` | **Orbital Bloom** | All 24 bands shape a radial bloom while transients launch shockwaves. |
-| `3` | **Signal Trace** | The waveform becomes the form; crest factor and spectral flux create depth and echoes. |
-| `4` | **Pulse Lattice** | The original pixel ripple returns with directional frequency detail. |
-| `5` | **Contour Memory** | Energy, brightness and transients raise and disturb a topographic field. |
+| Key | Scene and claim | What is represented | What it does not claim |
+| --- | --- | --- | --- |
+| `1` | **Auditory Field** · `AV01-SCI-001` | Blackman-windowed short-time spectrum grouped into 24 ERB-spaced bands | Source or instrument recognition, masking or an individualized hearing model |
+| `2` | **Tonal Orbit** · `AV01-SCI-002` | Twelve-bin, octave-folded equal-tempered pitch-class energy | Note, octave, chord, key or tuning identification |
+| `3` | **Temporal Scope** · `AV01-SCI-003` | Recent mono waveform, RMS, sample peak, crest factor and zero-crossing rate | SPL, LUFS, true peak, stereo phase or calibrated measurement |
+| `4` | **Rhythm Lattice** · `AV01-SCI-004` | Spectral-change onset strength and short-term autocorrelation periodicity | A confirmed beat, tempo, downbeat, meter or groove |
+| `5` | **Recurrence Atlas** · `AV01-SCI-005` | Rolling cosine self-similarity of normalized log-ERB spectral shape | Song sections, motifs, sources or structural boundaries |
 
-Every scene can be combined with four color systems and three output frames. Sensitivity, intensity, motion, bloom and detail remain independent, so the result can become yours rather than a fixed preset.
+Every scene can be combined with four color systems and three output frames. Sensitivity, intensity, glow and detail remain independent, so the result can become yours rather than a fixed preset. The formulas, timing windows, sources and limitations behind every claim ID live in the [scientific contract](docs/SCIENCE.md).
 
 ## It listens to more than volume
 
-The original visualizer reduced each frame of audio to one peak value. AV/01 keeps the immediacy but gives the sound a much larger vocabulary:
+The original visualizer reduced each frame of audio to one peak value. AV/01 keeps the immediacy but gives the sound a larger, more exact vocabulary:
 
-- 24 log/perceptual frequency bands with real frequency boundaries.
-- RMS and peak for continuous energy and transient scale.
-- Crest factor for the relationship between body and attack.
-- Spectral centroid, rolloff and brightness for tonal shape.
-- Adaptive spectral flux for change and onset energy.
-- Waveform samples for shape and polarity.
+- 24 triangular bands laid out on the ERB-rate scale.
+- Twelve octave-folded pitch-class energy bins under a fixed A4 = 440 Hz, twelve-tone equal-tempered mapping.
+- A recent mono waveform with RMS, sample peak, crest factor and zero-crossing rate.
+- Positive log-spectral change for onset strength, followed by a short-window periodicity candidate.
+- An eight-second rolling self-similarity matrix of normalized log-ERB spectral shape.
+- Spectral centroid, 85% rolloff and a high-frequency power ratio as acoustic descriptors—not direct measures of perceived brightness.
 - Silence hysteresis so the visuals settle instead of chattering around a threshold.
 
-The goal is not to show more data. It is to make the visuals respond in ways that feel musical.
+The level display is normalized digital dBFS, not LUFS or acoustic SPL. The analyser is a browser-defined mono downmix, microphone processing can vary by device and browser, and the nominal 50 Hz feature clock can jitter. The goal is not to show more data. It is to make the visuals respond in ways that feel musical while staying honest about what was measured.
 
 ## Start the instrument
 
@@ -76,7 +78,7 @@ The goal is not to show more data. It is to make the visuals respond in ways tha
 
 - Node.js `22.12.0` or newer
 - npm `11`
-- A current desktop browser; Chrome and Edge currently provide the broadest capture and recording support
+- A current desktop browser; source capture and recording support are capability-dependent
 
 ### Install and run
 
@@ -102,9 +104,11 @@ npm run start
 
 1. Choose **Open a track**, **Capture audio** or **Use microphone**.
 2. When capturing system audio, select a tab or application and enable the browser's **Share audio** option.
-3. Choose a scene and shape its response in the inspector.
+3. Choose a scene and shape its visual settings in the inspector.
 4. Scrub a file with the waveform timeline or perform against a live source.
 5. Save a PNG frame, enter fullscreen or open **Export** to record the performance.
+
+Before a source is active, AV/01 can show a deterministic **synthetic preview** generated at a nominal 48 kHz with seed 7 and a 118 BPM pulse pattern. It is a designed feature demonstration, not captured audio, and it is never used to fill in missing live signal.
 
 ### Keyboard controls
 
@@ -151,7 +155,7 @@ file / system share / microphone
               │
               ▼
    allocation-stable feature bus
-   bands · dynamics · spectral shape · waveform · silence
+   ERB · chroma · dynamics · onset-envelope periodicity · self-similarity
               │
               ▼
    WebGL 2 scene renderer ───────────► Canvas 2D fallback
@@ -160,12 +164,13 @@ file / system share / microphone
               └──── canvas stream + audio ──► MediaRecorder
 ```
 
-The render loop is ref-driven and does not push React state on every frame. Feature arrays are allocated once and reused. File playback time provides deterministic timing across pause, seek, preview and export.
+The render loop is ref-driven and does not push React state on every frame. Feature arrays are allocated once and reused. The media playhead coordinates transport and full-track export, while analysis history resets across seek, source change, stop and replay-from-end. No scene consumes an autonomous presentation clock; the feature clock remains subject to the browser-timing limits in the [scientific contract](docs/SCIENCE.md#timing-and-repeatability).
 
 | Path | Responsibility |
 | --- | --- |
 | `src/hooks/useAudioEngine.ts` | Audio context, file decoding, waveform peaks, live capture, transport and recording output. |
-| `src/lib/audio/feature-bus.ts` | Perceptual bands, dynamics, spectral features, smoothing and silence detection. |
+| `src/lib/audio/feature-bus.ts` | Browser analyser ingestion, feature-frame lifecycle, smoothing, silence state and analysis routing. |
+| `src/lib/audio/scientific-analysis.ts` | ERB transforms, chroma folding, onset-envelope periodicity and rolling self-similarity. |
 | `src/lib/visualizer/shaders.ts` | Full-screen WebGL shader programs for the five scenes. |
 | `src/lib/visualizer/renderer.ts` | Feature-to-uniform mapping, WebGL lifecycle and Canvas 2D fallback. |
 | `src/hooks/useCanvasRecorder.ts` | Format negotiation, capture composition, progress, limits and downloadable recordings. |
@@ -175,7 +180,7 @@ The render loop is ref-driven and does not push React state on every frame. Feat
 
 - The landing animation can always be paused from the canvas or with `Space`.
 - A reduced-motion preference opens the landing experience as a static frame.
-- **Visual comfort** is enabled by default and softens rapid audio-driven changes, high-frequency grain and bloom.
+- **Visual comfort** is enabled by default and reduces renderer glow and bright-highlight contrast.
 - Scene, palette, frame, transport, timeline and switch controls expose semantic names and states.
 - Focus indicators, dialog semantics and error announcements are built into the interface.
 
@@ -199,17 +204,18 @@ Browser support is based on capabilities rather than a version number:
 ```bash
 npm run type-check
 npm run lint
+npm test
 npm run build
 npm run audit:ci
 ```
 
-The AV/01 release has also been exercised in a real browser across desktop, mobile and short-landscape layouts; WebGL context loss; Canvas 2D fallback; reduced motion; file playback; background-tab recording; and a complete 1280 × 720 VP9/Opus video export.
+The first AV/01 rebuild was exercised in a real browser across desktop, mobile and short-landscape layouts; WebGL context loss; Canvas 2D fallback; reduced motion; file playback; background-tab recording; and a complete 1280 × 720 VP9/Opus video export. That remains the historical UI/export baseline. The scientific-analysis candidate now has a separate [validation record](docs/VALIDATION.md): deterministic, scene-routing, matched-signal, reset and local-file export gates pass; live-capture integration is partial and the defined long-session gate is still open. These are internal engineering results, not peer review, perceptual validation or metrological approval.
 
 ## What comes next
 
 This version has a clear technical boundary: `AnalyserNode`, WebGL 2 with Canvas fallback and real-time `MediaRecorder` output.
 
-The next steps I care about are AudioWorklet/WASM analysis, beat phase, chroma, tempo confidence, a progressive WebGPU renderer, project files, automation, MIDI/OSC control and deterministic offline export through WebCodecs.
+The next steps I care about are AudioWorklet/worker/WASM analysis, tuning-aware pitch-class energy, multiple periodicity hypotheses, multiscale recurrence, recorded cross-browser signal fixtures, independent method review, a progressive WebGPU renderer, project files, automation, MIDI/OSC control and deterministic offline export through WebCodecs.
 
 The goal is not more particles, more controls or louder effects. I want AV/01 to become the most expressive browser-native audio visualizer I can build: musically aware, visually distinctive, technically honest and open enough for someone else to make the result their own.
 

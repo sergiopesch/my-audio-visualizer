@@ -1,4 +1,10 @@
 import type { CSSProperties } from "react";
+import type {
+  AudioCaptureSettings,
+  AudioSourceDetails,
+  SourceMode,
+} from "@/hooks/useAudioEngine";
+import { PITCH_CLASS_NAMES } from "@/lib/audio/scientific-analysis";
 import {
   ASPECTS,
   PALETTES,
@@ -6,9 +12,14 @@ import {
   type VisualSettings,
 } from "@/lib/visualizer/types";
 import { Icon } from "./Icons";
+import type { Telemetry } from "./VisualizerCanvas";
 
 interface InspectorPanelProps {
   settings: VisualSettings;
+  telemetry: Telemetry;
+  sourceMode: SourceMode;
+  captureSettings: AudioCaptureSettings | null;
+  sourceDetails: AudioSourceDetails | null;
   onChange: (patch: Partial<VisualSettings>) => void;
   onReset: () => void;
 }
@@ -55,8 +66,81 @@ function ParameterSlider({
   );
 }
 
-export function InspectorPanel({ settings, onChange, onReset }: InspectorPanelProps) {
+function percentage(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function sceneReadouts(
+  sceneId: VisualSettings["scene"],
+  telemetry: Telemetry,
+): readonly [string, string][] {
+  if (sceneId === "field") {
+    return [
+      ["Centroid", `${Math.round(telemetry.centroidHz)} Hz`],
+      ["85% rolloff", `${Math.round(telemetry.rolloffHz)} Hz`],
+      [">3 kHz power", percentage(telemetry.highFrequencyRatio)],
+    ];
+  }
+  if (sceneId === "orbit") {
+    return [
+      [
+        "Strongest class",
+        telemetry.dominantChroma >= 0
+          ? PITCH_CLASS_NAMES[telemetry.dominantChroma] ?? "—"
+          : "—",
+      ],
+      ["Class concentration", percentage(telemetry.chromaConcentration)],
+      ["Inference", "Pitch-class energy only"],
+    ];
+  }
+  if (sceneId === "trace") {
+    return [
+      ["RMS level", `${telemetry.levelDbFs.toFixed(1)} dBFS`],
+      ["Crest factor", `${telemetry.crestFactor.toFixed(2)}×`],
+      ["Zero crossings", percentage(telemetry.zeroCrossingRate)],
+    ];
+  }
+  if (sceneId === "lattice") {
+    return [
+      ["Onset strength", percentage(telemetry.onsetStrength)],
+      [
+        "Period candidate",
+        telemetry.periodicityBpm > 0
+          ? `${telemetry.periodicityBpm.toFixed(1)} BPM-eq.`
+          : "Gathering evidence",
+      ],
+      [
+        "Heuristic evidence / history",
+        `${percentage(telemetry.periodicityEvidence)} / ${telemetry.rhythmEvidenceSeconds.toFixed(1)} s`,
+      ],
+    ];
+  }
+  return [
+    ["Recurrence >2 s", percentage(telemetry.recurrence)],
+    ["History compared", `${(telemetry.similarityCount / 8).toFixed(1)} s`],
+    ["Matrix samples", `${telemetry.similarityCount} / 64`],
+  ];
+}
+
+function settingState(value: boolean | undefined): string {
+  if (value === undefined) return "not reported";
+  return value ? "on" : "off";
+}
+
+export function InspectorPanel({
+  settings,
+  telemetry,
+  sourceMode,
+  captureSettings,
+  sourceDetails,
+  onChange,
+  onReset,
+}: InspectorPanelProps) {
   const scene = findScene(settings.scene);
+  const readouts = sceneReadouts(scene.id, telemetry);
+  const windowMilliseconds = telemetry.sampleRate > 0
+    ? (telemetry.fftSize / telemetry.sampleRate) * 1_000
+    : 0;
   return (
     <aside className="inspector-panel" aria-label="Visual controls">
       <div className="inspector-title">
@@ -74,6 +158,58 @@ export function InspectorPanel({ settings, onChange, onReset }: InspectorPanelPr
         <h2>{scene.name}</h2>
         <p>{scene.description}</p>
         <small>{scene.mapping}</small>
+      </section>
+
+      <section className="inspector-section science-panel" aria-labelledby="science-title">
+        <h3 id="science-title">HOW THIS SCENE LISTENS · AV01-SCI-00{scene.index + 1}</h3>
+        <p className="science-representation">{scene.representation}</p>
+        <p className="science-question">{scene.question}</p>
+        <dl className="science-readouts">
+          {readouts.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="science-limitation">
+          <strong>Does not infer:</strong> {scene.limitation}
+        </p>
+        <small className="science-method">
+          {telemetry.fftSize || 4_096}-sample {scene.id === "trace"
+            ? "unwindowed time-domain readout"
+            : "browser Blackman spectrum"}
+          {windowMilliseconds > 0 ? ` · ${windowMilliseconds.toFixed(1)} ms` : ""}
+          {` · nominal ${telemetry.analysisRateHz} Hz · mono analysis graph ${telemetry.sampleRate} Hz`}
+        </small>
+        {sourceMode === "file" && sourceDetails ? (
+          <small className="science-method">
+            Decoded file overview: {sourceDetails.sampleRate} Hz · {sourceDetails.channelCount} ch
+            {sourceDetails.channelCount > 1 ? " · playback analyser downmixes to mono" : ""}
+            {" · browser decode may resample"}
+          </small>
+        ) : null}
+        {sourceMode !== "file" && sourceMode !== "none" && captureSettings ? (
+          <small className="science-method">
+            {sourceMode === "microphone" ? "Reported microphone" : "Reported capture"}: {captureSettings.sampleRate ?? "?"} Hz · {captureSettings.channelCount ?? "?"} ch
+            {` · echo cancellation ${settingState(captureSettings.echoCancellation)}`}
+            {` · noise suppression ${settingState(captureSettings.noiseSuppression)}`}
+            {` · auto gain ${settingState(captureSettings.autoGainControl)}`}
+          </small>
+        ) : null}
+        {sourceMode !== "file" && sourceMode !== "none" && !captureSettings && sourceDetails ? (
+          <small className="science-method">
+            Analysis graph fallback: {sourceDetails.sampleRate} Hz · {sourceDetails.channelCount} ch · capture track did not report settings
+          </small>
+        ) : null}
+        <a
+          className="science-link"
+          href="https://github.com/sergiopesch/my-audio-visualizer/blob/main/docs/SCIENCE.md"
+          target="_blank"
+          rel="noreferrer"
+        >
+          METHOD, SOURCES &amp; LIMITS ↗
+        </a>
       </section>
 
       <section className="inspector-section" aria-labelledby="response-title">
@@ -97,15 +233,8 @@ export function InspectorPanel({ settings, onChange, onReset }: InspectorPanelPr
             onChange={(intensity) => onChange({ intensity })}
           />
           <ParameterSlider
-            id="motion-control"
-            label="Motion"
-            value={settings.motion}
-            display={`${Math.round(settings.motion * 100)}`}
-            onChange={(motion) => onChange({ motion })}
-          />
-          <ParameterSlider
             id="bloom-control"
-            label="Bloom"
+            label="Glow"
             value={settings.bloom}
             display={`${Math.round(settings.bloom * 100)}`}
             onChange={(bloom) => onChange({ bloom })}
@@ -168,15 +297,17 @@ export function InspectorPanel({ settings, onChange, onReset }: InspectorPanelPr
       <section className="safety-row">
         <div>
           <strong>Visual comfort</strong>
-          <small>Softens rapid flashes and bloom</small>
+          <small>Reduces glow and highlight contrast</small>
         </div>
         <button
           type="button"
-          className={`switch-control${settings.flashSafe ? " is-on" : ""}`}
+          className={`switch-control${settings.highlightCompression ? " is-on" : ""}`}
           role="switch"
-          aria-checked={settings.flashSafe}
+          aria-checked={settings.highlightCompression}
           aria-label="Visual comfort mode"
-          onClick={() => onChange({ flashSafe: !settings.flashSafe })}
+          onClick={() => onChange({
+            highlightCompression: !settings.highlightCompression,
+          })}
         >
           <span />
         </button>

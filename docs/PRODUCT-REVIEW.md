@@ -8,6 +8,8 @@ ThorstenClip was the next exploration. It pushed the analysis, interface and out
 
 AV/01 brings the best of both projects together and gives the idea room to become itself.
 
+This review tells the product story. [The scientific contract and provenance](SCIENCE.md) is the companion record for formulas, source literature, current windows and validation status.
+
 ## The versions I reviewed
 
 - The literal beginning: Audio Visualizer commit [`7305457`](https://github.com/sergiopesch/my-audio-visualizer/commit/73054575ebad1975cd8b4afd683da361af060993)
@@ -91,7 +93,7 @@ source → Web Audio graph → feature bus → scene renderer → canvas
                                              canvas → export video
 ```
 
-The same audio graph, feature frame, scene, palette, settings and playback clock now drive everything the user sees and exports.
+For an active user source, the same audio graph, feature frame, scene, palette, settings and playback clock now drive what the user sees and exports. The landing state is a separately labeled deterministic synthetic preview; it is never presented as captured audio or used to replace a missing live signal.
 
 That sounds obvious, but neither earlier project handled it completely.
 
@@ -99,47 +101,56 @@ That sounds obvious, but neither earlier project handled it completely.
 
 AV/01 now reads:
 
-- 24 log/perceptual frequency bands with real frequency boundaries.
-- RMS and peak for continuous energy and transient scale.
-- Crest factor for the relationship between body and attack.
-- Spectral centroid and rolloff for perceived brightness and bandwidth.
-- Adaptive spectral flux for change and onset energy rather than raw loudness.
-- Waveform samples for shape and polarity.
+- 24 triangular frequency bands laid out on the ERB-rate scale.
+- Twelve octave-folded pitch-class energy bins under a fixed A4 = 440 Hz, twelve-tone equal-tempered mapping.
+- A recent mono waveform with RMS, sample peak, crest factor and zero-crossing rate.
+- Positive log-spectral change for onset strength, then short-window autocorrelation for a periodicity candidate.
+- A rolling cosine self-similarity matrix of level-normalized, mean-centred log-ERB spectral shape.
+- Spectral centroid, 85% rolloff and a high-frequency power ratio as acoustic descriptors, not direct measures of perceived brightness.
 - Silence hysteresis so visuals settle instead of chattering around a threshold.
 
-These values move through reusable, allocation-stable feature frames. The renderer receives a coherent signal description instead of searching for one winning FFT bin every frame.
+These values move through reusable, allocation-stable feature frames on a nominal 50 Hz analysis clock, separate from display refresh. The renderer receives a coherent signal description instead of searching for one winning FFT bin every frame.
+
+I also name the boundaries. The level is normalized digital dBFS, not LUFS or acoustic SPL. Web Audio gives AV/01 a browser-defined mono analyser window, not calibrated stereo measurement. Browser timing is nominal, and microphone processing can still vary even when AV/01 requests it off.
 
 ## The new visual vocabulary
 
-### Spectral Field
+### Auditory Field · `AV01-SCI-001`
 
-A liquid spatial field carved by timbre and dynamics. Bass bends the space, mids form ribbons and high frequencies reveal surface detail.
+A short-time spectrum grouped into 24 ERB-rate-spaced triangular regions. It shows where spectral energy sits now; it does not recognize sources or instruments or model an individual listener.
 
-### Orbital Bloom
+### Tonal Orbit · `AV01-SCI-002`
 
-All 24 bands shape a radial instrument. Transients create their own shockwaves rather than only increasing the size of everything else.
+Twelve octave-folded pitch-class energy bins become fixed sectors. It shows concentration under the chosen mapping; it does not identify a note, octave, chord, key or tuning.
 
-### Signal Trace
+### Temporal Scope · `AV01-SCI-003`
 
-The waveform becomes a visual form instead of a diagnostic line. Crest factor and spectral change create depth and repetition.
+The recent mono waveform becomes the form, with RMS, sample peak, crest factor and zero-crossing rate visible around it. It is not LUFS, SPL, true peak, stereo phase or a laboratory oscilloscope.
 
-### Pulse Lattice
+### Rhythm Lattice · `AV01-SCI-004`
 
-This is the original pixel-ripple idea rebuilt rather than discarded. Frequency bands illuminate different cells, bass expands the structure and treble fractures its edges.
+Onset-strength evidence excites the original lattice idea, while short-term autocorrelation offers a periodicity candidate, a heuristic evidence score and the history duration. The score is not a probability or calibrated confidence. The scene does not confirm a beat, tempo, downbeat, meter or groove.
 
-### Contour Memory
+### Recurrence Atlas · `AV01-SCI-005`
 
-Energy, brightness and transients raise and disturb a topographic field, giving the signal a sense of terrain and history.
+Recent spectral shape becomes a rolling time-by-time cosine self-similarity matrix. A bright off-diagonal cell means resemblance inside the current eight-second history; it does not label a chorus, verse, motif, source or structural boundary.
 
-Scenes are independent from palette, frame, response and visual-comfort settings. The system is composable instead of being a collection of locked presets.
+Scenes are independent from sensitivity, intensity, glow, detail, palette, frame and visual-comfort settings. The system is composable instead of being a collection of locked presets.
+
+## The scientific contract
+
+I do not want a citation to become decoration or borrowed authority. Each scene now has a stable claim ID, a narrow question, an explicit exclusion and a primary-source trail in [the scientific contract](SCIENCE.md#the-five-scene-contract).
+
+Those sources establish precedents for the signal representations. They do not endorse AV/01, validate the artistic mappings or approve the implementation. The [release-candidate validation record](VALIDATION.md) now publishes the fixture, browser, lifecycle and provenance evidence: the five local-file scene contracts pass internally, while live-capture integration is partial and long-session timing remains open. Perceptual study, independent peer review and metrological certification are separate things, and AV/01 does not claim any of them.
 
 ## The standard I am setting
 
 The AV/01 rebuild now includes:
 
 - A WebGL 2 shader pipeline with a distinct Canvas 2D fallback.
-- Allocation-stable audio feature extraction and a ref-driven render loop.
-- Deterministic file timing across pause, seek, preview and export.
+- Allocation-stable audio feature extraction, a nominal 50 Hz analysis clock decoupled from display refresh and explicit state reset across source discontinuities.
+- Signal-derived scene state without an extra autonomous animation clock.
+- Media-playhead transport/export coordination, with analysis history reset across seek, source change, stop and replay-from-end.
 - Local file, microphone and shared tab/application sources.
 - A real waveform timeline and keyboard-operable transport.
 - Landscape, square and portrait output frames.
@@ -150,9 +161,9 @@ The AV/01 rebuild now includes:
 - Responsive desktop, mobile and short-landscape layouts.
 - Standard clean-clone development and production commands.
 
-## How I tested it
+## How I validate it
 
-The finished rebuild passed:
+The first AV/01 rebuild established a UI, lifecycle and export baseline. That earlier release passed:
 
 - TypeScript validation.
 - ESLint, React hooks, imports and accessibility rules.
@@ -166,6 +177,10 @@ The finished rebuild passed:
 - Export from paused and ended file states.
 - Export across a background-tab transition.
 - A complete recorded file verified as 1280 × 720 VP9 video with 48 kHz stereo Opus audio.
+
+The new scientific-analysis release is a separate evidence set. Its deterministic numerical fixtures, signal-family fixtures, scene-contract routing, reset/seek/source lifecycle and local-file export provenance now pass internally in the [validation register](SCIENCE.md#validation-register). Browser integration is partial because system/microphone capture was not exercised, and long-session timing remains open.
+
+I call the five local-file scene contracts internally validated only within the recorded evidence boundary. I do not call AV/01 peer reviewed, perceptually validated, metrologically certified or approved by any cited author, publisher or standards body.
 
 ## The project history is part of the product
 
@@ -184,23 +199,26 @@ This version has a clear browser baseline: `AnalyserNode`, WebGL 2 with Canvas f
 
 The next level is:
 
-1. Move analysis into `AudioWorklet` plus a worker/WASM feature engine for custom FFT windows, beat phase, chroma, key and tempo confidence.
-2. Add a progressive WebGPU renderer while retaining WebGL 2 and Canvas fallbacks.
-3. Add project files, scene presets, automation lanes and MIDI/OSC input.
-4. Add deterministic offline rendering with WebCodecs when browser coverage and audio-container tooling meet the reliability bar.
-5. Add optional text, camera, image and depth layers without turning the core instrument into a transcription product.
-6. Build automated visual-regression, audio-fixture, recorder-lifecycle and long-session performance suites.
+1. Move analysis into `AudioWorklet` plus a worker/WASM feature engine for custom FFT windows and more stable scheduling.
+2. Add tuning-aware pitch-class analysis and retain multiple periodicity hypotheses instead of collapsing ambiguity too early.
+3. Extend recurrence across multiple time scales without turning visual similarity into unsupported song-structure labels.
+4. Record cross-browser signal fixtures, publish release evidence and invite independent method review.
+5. Add a progressive WebGPU renderer while retaining WebGL 2 and Canvas fallbacks.
+6. Add project files, scene presets, automation lanes and MIDI/OSC input.
+7. Add deterministic offline rendering with WebCodecs when browser coverage and audio-container tooling meet the reliability bar.
+8. Add optional text, camera, image and depth layers without turning the core instrument into a transcription product.
 
 ## Standards informing the work
 
-- [Web Audio API specification](https://www.w3.org/TR/webaudio-1.1/)
-- [MDN: AnalyserNode](https://developer.mozilla.org/en-US/docs/Web/API/AnalyserNode)
-- [MDN: AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet)
-- [MDN: MediaStreamAudioDestinationNode](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamAudioDestinationNode)
-- [MDN: WebCodecs](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API)
-- [WebGPU support across major browsers](https://web.dev/blog/webgpu-supported-major-browsers)
-- [WCAG: Pause, Stop, Hide](https://www.w3.org/WAI/WCAG22/Understanding/pause-stop-hide.html)
-- [WCAG: Three Flashes or Below Threshold](https://www.w3.org/WAI/WCAG22/Understanding/three-flashes-or-below-threshold.html)
+The complete paper and standards registry is in [the scientific contract](SCIENCE.md#primary-source-registry). The platform and measurement boundaries are grounded in official sources:
+
+- [W3C Web Audio API Recommendation](https://www.w3.org/TR/2021/REC-webaudio-20210617/) and the [Web Audio API 1.1 First Public Working Draft](https://www.w3.org/TR/webaudio-1.1/)
+- [W3C Media Capture and Streams](https://www.w3.org/TR/mediacapture-streams/)
+- [W3C MediaStream Recording](https://www.w3.org/TR/mediastream-recording/)
+- [W3C WebGPU](https://www.w3.org/TR/webgpu/)
+- [W3C WebCodecs](https://www.w3.org/TR/webcodecs/)
+- [W3C Web Content Accessibility Guidelines 2.2](https://www.w3.org/TR/WCAG22/)
+- [ITU-R BS.1770-5](https://www.itu.int/rec/R-REC-BS.1770-5-202311-I) and [EBU R 128, version 5.0](https://tech.ebu.ch/publications/r128) for the loudness methods AV/01 does not claim to implement
 
 The goal is not more particles, more controls or louder effects.
 

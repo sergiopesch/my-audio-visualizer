@@ -6,11 +6,23 @@ import type {
   FeatureFrame,
   LiveFeatureBusOptions,
 } from "./types";
+import {
+  CHROMA_BIN_COUNT,
+  RHYTHM_SAMPLE_RATE_HZ,
+  SELF_SIMILARITY_SIZE,
+  RhythmPeriodicityTracker,
+  SelfSimilarityTracker,
+  fillScalePoints,
+  normalizedEntropyConcentration,
+  pitchClassForFrequency,
+} from "./scientific-analysis";
 
-const WAVEFORM_SIZE = 64;
-const DEFAULT_FFT_SIZE = 2048;
+const WAVEFORM_SIZE = 256;
+const DEFAULT_FFT_SIZE = 4096;
 const DEFAULT_SAMPLE_RATE = 48_000;
 const DEFAULT_FRAME_MS = 1000 / 60;
+const ANALYSIS_RATE_HZ = RHYTHM_SAMPLE_RATE_HZ;
+const SIMILARITY_INTERVAL_SECONDS = 0.125;
 const EPSILON = 1e-8;
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -20,7 +32,7 @@ type ResolvedOptions = {
   bandScale: AudioBandScale;
   minFrequencyHz: number;
   maxFrequencyHz: number;
-  brightnessCutoffHz: number;
+  highFrequencyCutoffHz: number;
   rolloffPercent: number;
   attackSeconds: number;
   releaseSeconds: number;
@@ -59,14 +71,6 @@ function smoothAttackRelease(
   return current + (target - current) * smoothingAlpha(deltaSeconds, time);
 }
 
-function hzToMel(hz: number): number {
-  return 2595 * Math.log10(1 + hz / 700);
-}
-
-function melToHz(mel: number): number {
-  return 700 * (10 ** (mel / 2595) - 1);
-}
-
 function isValidFftSize(value: number): boolean {
   return (
     Number.isInteger(value) &&
@@ -86,9 +90,9 @@ function resolveOptions(
     throw new RangeError("bandCount must be either 16 or 24");
   }
 
-  const bandScale = input.bandScale ?? "log";
-  if (bandScale !== "log" && bandScale !== "mel") {
-    throw new RangeError('bandScale must be either "log" or "mel"');
+  const bandScale = input.bandScale ?? "erb";
+  if (bandScale !== "erb" && bandScale !== "log" && bandScale !== "mel") {
+    throw new RangeError('bandScale must be "erb", "log", or "mel"');
   }
 
   const minimumAllowedHz = Math.max(1, binHz * 0.5);
@@ -107,8 +111,8 @@ function resolveOptions(
     throw new RangeError("maxFrequencyHz must be greater than minFrequencyHz");
   }
 
-  const brightnessCutoffHz = clamp(
-    finiteOr(input.brightnessCutoffHz, 3_000),
+  const highFrequencyCutoffHz = clamp(
+    finiteOr(input.highFrequencyCutoffHz, 3_000),
     binHz,
     nyquistHz,
   );
@@ -144,7 +148,7 @@ function resolveOptions(
     bandScale,
     minFrequencyHz,
     maxFrequencyHz,
-    brightnessCutoffHz,
+    highFrequencyCutoffHz,
     rolloffPercent,
     attackSeconds,
     releaseSeconds,
@@ -177,10 +181,17 @@ export class AudioFeatureBus implements FeatureBus {
   private readonly byteTimeDomain: Uint8Array<ArrayBuffer> | null;
   private readonly byteFrequency: Uint8Array<ArrayBuffer> | null;
   private readonly previousSpectrum: Float32Array<ArrayBuffer>;
+  private readonly filterPointsHz: Float32Array<ArrayBuffer>;
   private readonly bandWeights: Float32Array<ArrayBuffer>;
   private readonly bandWeightSums: Float32Array<ArrayBuffer>;
   private readonly bandStartBins: Int32Array<ArrayBuffer>;
   private readonly bandEndBins: Int32Array<ArrayBuffer>;
+  private readonly chromaLower: Uint8Array<ArrayBuffer>;
+  private readonly chromaUpper: Uint8Array<ArrayBuffer>;
+  private readonly chromaMix: Float32Array<ArrayBuffer>;
+  private readonly chromaIncluded: Uint8Array<ArrayBuffer>;
+  private readonly rhythmTracker = new RhythmPeriodicityTracker();
+  private readonly similarityTracker: SelfSimilarityTracker;
   private readonly hasFloatTimeData: boolean;
   private readonly hasFloatFrequencyData: boolean;
   private readonly seedPhaseA: number;
@@ -191,6 +202,7 @@ export class AudioFeatureBus implements FeatureBus {
   private hasFrame = false;
   private hasSpectrumHistory = false;
   private belowSilenceSeconds = 0;
+  private similarityAccumulatorSeconds = 0;
   private _disposed = false;
 
   constructor(analyser: AnalyserNode, options?: LiveFeatureBusOptions);
@@ -247,18 +259,27 @@ export class AudioFeatureBus implements FeatureBus {
     const bandsRaw = new Float32Array(this.options.bandCount);
     const bandCentersHz = new Float32Array(this.options.bandCount);
     const bandEdgesHz = new Float32Array(this.options.bandCount + 1);
+    const chroma = new Float32Array(CHROMA_BIN_COUNT);
+    const chromaRaw = new Float32Array(CHROMA_BIN_COUNT);
 
     this.previousSpectrum = new Float32Array(frequencyBinCount);
+    this.filterPointsHz = new Float32Array(this.options.bandCount + 2);
     this.bandWeights = new Float32Array(this.options.bandCount * frequencyBinCount);
     this.bandWeightSums = new Float32Array(this.options.bandCount);
     this.bandStartBins = new Int32Array(this.options.bandCount);
     this.bandEndBins = new Int32Array(this.options.bandCount);
+    this.chromaLower = new Uint8Array(frequencyBinCount);
+    this.chromaUpper = new Uint8Array(frequencyBinCount);
+    this.chromaMix = new Float32Array(frequencyBinCount);
+    this.chromaIncluded = new Uint8Array(frequencyBinCount);
+    this.similarityTracker = new SelfSimilarityTracker(this.options.bandCount);
 
     this.mutableFrame = {
       mode: this.mode,
       sampleRate,
       fftSize,
       binHz,
+      analysisRateHz: ANALYSIS_RATE_HZ,
       sequence: 0,
       timestampMs: 0,
       timeSeconds: 0,
@@ -269,15 +290,21 @@ export class AudioFeatureBus implements FeatureBus {
       peakRaw: 0,
       crestFactor: 0,
       crestFactorRaw: 0,
-      levelDb: this.options.spectrumFloorDb,
+      levelDbFs: this.options.spectrumFloorDb,
+      zeroCrossingRate: 0,
       spectralCentroidHz: 0,
       spectralCentroid: 0,
       spectralRolloffHz: 0,
       spectralRolloff: 0,
-      brightness: 0,
-      spectralFlux: 0,
+      highFrequencyRatio: 0,
+      onsetStrength: 0,
       spectralFluxRaw: 0,
       spectralFluxBaseline: 0,
+      periodicityBpm: 0,
+      periodicitySeconds: 0,
+      periodicityEvidence: 0,
+      pulsePhase: 0,
+      rhythmEvidenceSeconds: 0,
       isSilent: true,
       silenceDurationSeconds: 0,
       waveform,
@@ -287,6 +314,15 @@ export class AudioFeatureBus implements FeatureBus {
       bandsRaw,
       bandCentersHz,
       bandEdgesHz,
+      chroma,
+      chromaRaw,
+      chromaConcentration: 0,
+      dominantChroma: -1,
+      selfSimilarity: this.similarityTracker.matrix,
+      selfSimilaritySize: SELF_SIMILARITY_SIZE,
+      selfSimilarityHead: -1,
+      selfSimilarityCount: 0,
+      recurrence: 0,
     };
     this.frame = this.mutableFrame;
 
@@ -295,6 +331,7 @@ export class AudioFeatureBus implements FeatureBus {
     this.seedPhaseB = (Math.sin((numericSeed + 17) * 78.233) * 12345.6789) % 1;
 
     this.buildBandLayout();
+    this.buildChromaLayout();
   }
 
   get disposed(): boolean {
@@ -355,15 +392,21 @@ export class AudioFeatureBus implements FeatureBus {
     frame.peakRaw = 0;
     frame.crestFactor = 0;
     frame.crestFactorRaw = 0;
-    frame.levelDb = this.options.spectrumFloorDb;
+    frame.levelDbFs = this.options.spectrumFloorDb;
+    frame.zeroCrossingRate = 0;
     frame.spectralCentroidHz = 0;
     frame.spectralCentroid = 0;
     frame.spectralRolloffHz = 0;
     frame.spectralRolloff = 0;
-    frame.brightness = 0;
-    frame.spectralFlux = 0;
+    frame.highFrequencyRatio = 0;
+    frame.onsetStrength = 0;
     frame.spectralFluxRaw = 0;
     frame.spectralFluxBaseline = 0;
+    frame.periodicityBpm = 0;
+    frame.periodicitySeconds = 0;
+    frame.periodicityEvidence = 0;
+    frame.pulsePhase = 0;
+    frame.rhythmEvidenceSeconds = 0;
     frame.isSilent = true;
     frame.silenceDurationSeconds = 0;
     frame.waveform.fill(0);
@@ -371,6 +414,13 @@ export class AudioFeatureBus implements FeatureBus {
     frame.spectrumDb.fill(this.options.spectrumFloorDb);
     frame.bands.fill(0);
     frame.bandsRaw.fill(0);
+    frame.chroma.fill(0);
+    frame.chromaRaw.fill(0);
+    frame.chromaConcentration = 0;
+    frame.dominantChroma = -1;
+    frame.selfSimilarityHead = -1;
+    frame.selfSimilarityCount = 0;
+    frame.recurrence = 0;
     this.timeDomain.fill(0);
     this.previousSpectrum.fill(0);
     this.byteTimeDomain?.fill(128);
@@ -381,6 +431,9 @@ export class AudioFeatureBus implements FeatureBus {
     this.hasFrame = false;
     this.hasSpectrumHistory = false;
     this.belowSilenceSeconds = 0;
+    this.similarityAccumulatorSeconds = 0;
+    this.rhythmTracker.reset();
+    this.similarityTracker.reset();
   }
 
   dispose(): void {
@@ -397,46 +450,40 @@ export class AudioFeatureBus implements FeatureBus {
     const bandCount = this.options.bandCount;
     const minHz = this.options.minFrequencyHz;
     const maxHz = this.options.maxFrequencyHz;
-
-    if (this.options.bandScale === "mel") {
-      const minMel = hzToMel(minHz);
-      const melRange = hzToMel(maxHz) - minMel;
-      for (let index = 0; index <= bandCount; index += 1) {
-        edges[index] = melToHz(minMel + (melRange * index) / bandCount);
-      }
-      for (let index = 0; index < bandCount; index += 1) {
-        centers[index] = melToHz(
-          (hzToMel(edges[index]) + hzToMel(edges[index + 1])) * 0.5,
-        );
-      }
-    } else {
-      const ratio = maxHz / minHz;
-      for (let index = 0; index <= bandCount; index += 1) {
-        edges[index] = minHz * ratio ** (index / bandCount);
-      }
-      for (let index = 0; index < bandCount; index += 1) {
-        centers[index] = Math.sqrt(edges[index] * edges[index + 1]);
+    fillScalePoints(
+      this.filterPointsHz,
+      this.options.bandScale,
+      minHz,
+      maxHz,
+    );
+    edges[0] = this.filterPointsHz[0];
+    edges[bandCount] = this.filterPointsHz[bandCount + 1];
+    for (let band = 0; band < bandCount; band += 1) {
+      centers[band] = this.filterPointsHz[band + 1];
+      if (band > 0) {
+        edges[band] = (centers[band - 1] + centers[band]) * 0.5;
       }
     }
 
     const binHz = frame.binHz;
     const binCount = frame.spectrum.length;
     for (let band = 0; band < bandCount; band += 1) {
-      const lowHz = edges[band];
-      const highHz = edges[band + 1];
+      const lowHz = this.filterPointsHz[band];
+      const centerHz = this.filterPointsHz[band + 1];
+      const highHz = this.filterPointsHz[band + 2];
       let firstBin = binCount - 1;
       let lastBin = 0;
       let totalWeight = 0;
       const weightOffset = band * binCount;
 
       for (let bin = 0; bin < binCount; bin += 1) {
-        const binLowHz = Math.max(0, (bin - 0.5) * binHz);
-        const binHighHz = (bin + 0.5) * binHz;
-        const overlapHz = Math.max(
-          0,
-          Math.min(highHz, binHighHz) - Math.max(lowHz, binLowHz),
-        );
-        const weight = overlapHz / binHz;
+        const frequencyHz = bin * binHz;
+        const weight =
+          frequencyHz <= lowHz || frequencyHz >= highHz
+            ? 0
+            : frequencyHz <= centerHz
+              ? (frequencyHz - lowHz) / Math.max(EPSILON, centerHz - lowHz)
+              : (highHz - frequencyHz) / Math.max(EPSILON, highHz - centerHz);
         if (weight > 0) {
           this.bandWeights[weightOffset + bin] = weight;
           totalWeight += weight;
@@ -456,6 +503,23 @@ export class AudioFeatureBus implements FeatureBus {
       this.bandWeightSums[band] = totalWeight;
       this.bandStartBins[band] = firstBin;
       this.bandEndBins[band] = lastBin;
+    }
+  }
+
+  private buildChromaLayout(): void {
+    const frame = this.mutableFrame;
+    const minimumHz = Math.max(55, frame.binHz);
+    const maximumHz = Math.min(5_000, frame.sampleRate / 2);
+    for (let bin = 1; bin < frame.spectrum.length; bin += 1) {
+      const frequencyHz = bin * frame.binHz;
+      if (frequencyHz < minimumHz || frequencyHz > maximumHz) continue;
+      const pitchClass = pitchClassForFrequency(frequencyHz);
+      const lower = Math.floor(pitchClass) % CHROMA_BIN_COUNT;
+      const upper = (lower + 1) % CHROMA_BIN_COUNT;
+      this.chromaLower[bin] = lower;
+      this.chromaUpper[bin] = upper;
+      this.chromaMix[bin] = pitchClass - Math.floor(pitchClass);
+      this.chromaIncluded[bin] = 1;
     }
   }
 
@@ -566,26 +630,34 @@ export class AudioFeatureBus implements FeatureBus {
     const sampleCount = this.timeDomain.length;
     let squareSum = 0;
     let peakRaw = 0;
+    let zeroCrossings = 0;
+    let previousSample = Number.isFinite(this.timeDomain[0]) ? this.timeDomain[0] : 0;
 
     for (let index = 0; index < sampleCount; index += 1) {
-      const sample = clamp(this.timeDomain[index], -1, 1);
+      const currentSample = this.timeDomain[index];
+      const sample = Number.isFinite(currentSample) ? currentSample : 0;
       const absolute = Math.abs(sample);
       squareSum += sample * sample;
       if (absolute > peakRaw) peakRaw = absolute;
+      if (index > 0 && ((sample >= 0 && previousSample < 0) || (sample < 0 && previousSample >= 0))) {
+        zeroCrossings += 1;
+      }
+      previousSample = sample;
     }
 
     const rmsRaw = Math.sqrt(squareSum / sampleCount);
     const crestRaw = rmsRaw > EPSILON ? Math.min(32, peakRaw / rmsRaw) : 0;
+    const zeroCrossingRate = zeroCrossings / Math.max(1, sampleCount - 1);
     this.downsampleWaveform();
 
     const spectrum = frame.spectrum;
     const binHz = frame.binHz;
     const nyquistHz = frame.sampleRate / 2;
-    const brightnessBin = Math.ceil(this.options.brightnessCutoffHz / binHz);
+    const highFrequencyBin = Math.ceil(this.options.highFrequencyCutoffHz / binHz);
     let magnitudeSum = 0;
     let weightedFrequencySum = 0;
     let powerSum = 0;
-    let brightPowerSum = 0;
+    let highFrequencyPowerSum = 0;
     let fluxSum = 0;
 
     for (let bin = 1; bin < spectrum.length; bin += 1) {
@@ -594,9 +666,9 @@ export class AudioFeatureBus implements FeatureBus {
       magnitudeSum += amplitude;
       weightedFrequencySum += amplitude * bin * binHz;
       powerSum += power;
-      if (bin >= brightnessBin) brightPowerSum += power;
+      if (bin >= highFrequencyBin) highFrequencyPowerSum += power;
       if (this.hasSpectrumHistory) {
-        const delta = amplitude - this.previousSpectrum[bin];
+        const delta = Math.log1p(amplitude * 32) - Math.log1p(this.previousSpectrum[bin] * 32);
         if (delta > 0) fluxSum += delta;
       }
       this.previousSpectrum[bin] = amplitude;
@@ -616,13 +688,14 @@ export class AudioFeatureBus implements FeatureBus {
         }
       }
     }
-    const brightnessRaw = powerSum > EPSILON ? brightPowerSum / powerSum : 0;
+    const highFrequencyRatioRaw =
+      powerSum > EPSILON ? highFrequencyPowerSum / powerSum : 0;
     const fluxRaw = this.hasSpectrumHistory
       ? fluxSum / Math.max(1, spectrum.length - 1)
       : 0;
 
     const previousBaseline = frame.spectralFluxBaseline;
-    const fluxScale = Math.max(0.00025, previousBaseline * 2);
+    const fluxScale = Math.max(0.00025, previousBaseline * 1.5);
     const fluxTarget = 1 - Math.exp(-Math.max(0, fluxRaw - previousBaseline) / fluxScale);
     const baselineTime =
       fluxRaw > previousBaseline
@@ -633,11 +706,13 @@ export class AudioFeatureBus implements FeatureBus {
       (fluxRaw - previousBaseline) * smoothingAlpha(deltaSeconds, baselineTime);
 
     this.extractBands(deltaSeconds);
+    this.extractChroma(deltaSeconds);
 
     const initialize = !this.hasFrame;
     frame.rmsRaw = rmsRaw;
     frame.peakRaw = peakRaw;
     frame.crestFactorRaw = crestRaw;
+    frame.zeroCrossingRate = zeroCrossingRate;
     frame.spectralFluxRaw = fluxRaw;
     frame.spectralFluxBaseline = initialize ? fluxRaw : baseline;
 
@@ -686,19 +761,19 @@ export class AudioFeatureBus implements FeatureBus {
           this.options.attackSeconds,
           this.options.releaseSeconds,
         );
-    frame.brightness = initialize
-      ? brightnessRaw
+    frame.highFrequencyRatio = initialize
+      ? highFrequencyRatioRaw
       : smoothAttackRelease(
-          frame.brightness,
-          brightnessRaw,
+          frame.highFrequencyRatio,
+          highFrequencyRatioRaw,
           deltaSeconds,
           this.options.attackSeconds,
           this.options.releaseSeconds,
         );
-    frame.spectralFlux = initialize
+    frame.onsetStrength = initialize
       ? 0
       : smoothAttackRelease(
-          frame.spectralFlux,
+          frame.onsetStrength,
           fluxTarget,
           deltaSeconds,
           this.options.attackSeconds,
@@ -706,10 +781,26 @@ export class AudioFeatureBus implements FeatureBus {
         );
     frame.spectralCentroid = clamp(frame.spectralCentroidHz / nyquistHz, 0, 1);
     frame.spectralRolloff = clamp(frame.spectralRolloffHz / nyquistHz, 0, 1);
-    frame.levelDb =
+    frame.levelDbFs =
       frame.rms > EPSILON
         ? Math.max(this.options.spectrumFloorDb, 20 * Math.log10(frame.rms))
         : this.options.spectrumFloorDb;
+
+    const rhythm = this.rhythmTracker.update(frame.onsetStrength, deltaSeconds);
+    frame.periodicityBpm = rhythm.periodicityBpm;
+    frame.periodicitySeconds = rhythm.periodicitySeconds;
+    frame.periodicityEvidence = rhythm.periodicityEvidence;
+    frame.pulsePhase = rhythm.pulsePhase;
+    frame.rhythmEvidenceSeconds = rhythm.evidenceSeconds;
+
+    this.similarityAccumulatorSeconds += deltaSeconds;
+    if (initialize || this.similarityAccumulatorSeconds >= SIMILARITY_INTERVAL_SECONDS) {
+      this.similarityAccumulatorSeconds %= SIMILARITY_INTERVAL_SECONDS;
+      const similarity = this.similarityTracker.update(frame.bandsRaw);
+      frame.selfSimilarityHead = similarity.head;
+      frame.selfSimilarityCount = similarity.count;
+      frame.recurrence = similarity.recurrence;
+    }
 
     this.updateSilenceState(rmsRaw, deltaSeconds);
     this.hasSpectrumHistory = true;
@@ -741,19 +832,74 @@ export class AudioFeatureBus implements FeatureBus {
     }
   }
 
+  private extractChroma(deltaSeconds: number): void {
+    const frame = this.mutableFrame;
+    const raw = frame.chromaRaw;
+    raw.fill(0);
+    let includedPower = 0;
+
+    for (let bin = 1; bin < frame.spectrum.length; bin += 1) {
+      if (this.chromaIncluded[bin] === 0) continue;
+      const amplitude = frame.spectrum[bin];
+      const power = amplitude * amplitude;
+      if (power <= EPSILON) continue;
+      const mix = this.chromaMix[bin];
+      raw[this.chromaLower[bin]] += power * (1 - mix);
+      raw[this.chromaUpper[bin]] += power * mix;
+      includedPower += power;
+    }
+
+    if (includedPower > EPSILON) {
+      for (let pitchClass = 0; pitchClass < raw.length; pitchClass += 1) {
+        raw[pitchClass] /= includedPower;
+      }
+    } else {
+      frame.chroma.fill(0);
+      frame.chromaConcentration = 0;
+      frame.dominantChroma = -1;
+      return;
+    }
+
+    const initialize = !this.hasFrame;
+    let smoothedTotal = 0;
+    for (let pitchClass = 0; pitchClass < frame.chroma.length; pitchClass += 1) {
+      frame.chroma[pitchClass] = initialize
+        ? raw[pitchClass]
+        : smoothAttackRelease(
+            frame.chroma[pitchClass],
+            raw[pitchClass],
+            deltaSeconds,
+            this.options.attackSeconds,
+            this.options.releaseSeconds,
+          );
+      smoothedTotal += frame.chroma[pitchClass];
+    }
+    if (smoothedTotal > EPSILON) {
+      for (let pitchClass = 0; pitchClass < frame.chroma.length; pitchClass += 1) {
+        frame.chroma[pitchClass] /= smoothedTotal;
+      }
+    }
+
+    frame.chromaConcentration = normalizedEntropyConcentration(frame.chroma);
+    frame.dominantChroma = -1;
+    let maximum = 0;
+    for (let pitchClass = 0; pitchClass < frame.chroma.length; pitchClass += 1) {
+      if (frame.chroma[pitchClass] > maximum) {
+        maximum = frame.chroma[pitchClass];
+        frame.dominantChroma = pitchClass;
+      }
+    }
+  }
+
   private downsampleWaveform(): void {
     const waveform = this.mutableFrame.waveform;
     const source = this.timeDomain;
     for (let point = 0; point < WAVEFORM_SIZE; point += 1) {
-      const sourcePosition = (point * (source.length - 1)) / (WAVEFORM_SIZE - 1);
-      const lowerIndex = Math.floor(sourcePosition);
-      const upperIndex = Math.min(source.length - 1, lowerIndex + 1);
-      const mix = sourcePosition - lowerIndex;
-      waveform[point] = clamp(
-        source[lowerIndex] + (source[upperIndex] - source[lowerIndex]) * mix,
-        -1,
-        1,
-      );
+      const start = Math.floor((point * source.length) / WAVEFORM_SIZE);
+      const end = Math.max(start + 1, Math.floor(((point + 1) * source.length) / WAVEFORM_SIZE));
+      let sum = 0;
+      for (let index = start; index < end; index += 1) sum += source[index];
+      waveform[point] = clamp(sum / (end - start), -1, 1);
     }
   }
 

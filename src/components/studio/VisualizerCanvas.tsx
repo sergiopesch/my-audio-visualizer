@@ -20,15 +20,32 @@ import {
 } from "@/lib/visualizer/types";
 
 const TELEMETRY_INTERVAL_MS = 150;
+const ANALYSIS_INTERVAL_MS = 1_000 / 50;
+const MAX_ANALYSIS_STEP_MS = 100;
 
 export interface Telemetry {
   renderer: RendererKind;
-  /** Root-mean-square signal energy in the normalized 0..1 range. */
+  /** Root-mean-square digital amplitude in the normalized 0..1 range. */
   energy: number;
   peak: number;
-  flux: number;
+  crestFactor: number;
+  levelDbFs: number;
+  zeroCrossingRate: number;
+  onsetStrength: number;
   centroidHz: number;
   rolloffHz: number;
+  highFrequencyRatio: number;
+  chromaConcentration: number;
+  dominantChroma: number;
+  periodicityBpm: number;
+  periodicityEvidence: number;
+  pulsePhase: number;
+  rhythmEvidenceSeconds: number;
+  recurrence: number;
+  similarityCount: number;
+  analysisRateHz: number;
+  sampleRate: number;
+  fftSize: number;
   silent: boolean;
   fps: number;
 }
@@ -46,10 +63,12 @@ export interface VisualizerCanvasProps {
   outputMode?: "preview" | "export";
   outputModeSignal?: RefObject<"preview" | "export">;
   renderNowRef?: RefObject<(() => void) | null>;
+  resetAnalysisRef?: RefObject<(() => void) | null>;
 }
 
 interface CanvasRuntime {
   renderStill: () => void;
+  resetAnalysis: () => void;
   setActive: (active: boolean) => void;
 }
 
@@ -66,9 +85,8 @@ function effectiveSettings(
   return {
     ...settings,
     intensity: Math.min(settings.intensity, 0.68),
-    motion: 0,
     bloom: Math.min(settings.bloom, 0.3),
-    flashSafe: true,
+    highlightCompression: true,
   };
 }
 
@@ -124,6 +142,7 @@ export function VisualizerCanvas({
   outputMode = "preview",
   outputModeSignal,
   renderNowRef,
+  resetAnalysisRef,
 }: VisualizerCanvasProps) {
   const settingsRef = useRef(settings);
   const effectiveSettingsRef = useRef(settings);
@@ -213,7 +232,8 @@ export function VisualizerCanvas({
     let disposed = false;
     let failed = false;
     let animationFrameId: number | null = null;
-    let previousAnimationTimestampMs: number | null = null;
+    let analysisTimerId: number | null = null;
+    let lastAnalysisWallTimestampMs: number | null = null;
     let analysisClockMs = 0;
     let lastPlaybackTimeSeconds = 0;
     let playbackTimeErrorReported = false;
@@ -255,9 +275,24 @@ export function VisualizerCanvas({
           renderer: renderer.kind,
           energy,
           peak: frame.peak,
-          flux: frame.spectralFlux,
+          crestFactor: frame.crestFactor,
+          levelDbFs: frame.levelDbFs,
+          zeroCrossingRate: frame.zeroCrossingRate,
+          onsetStrength: frame.onsetStrength,
           centroidHz: frame.spectralCentroidHz,
           rolloffHz: frame.spectralRolloffHz,
+          highFrequencyRatio: frame.highFrequencyRatio,
+          chromaConcentration: frame.chromaConcentration,
+          dominantChroma: frame.dominantChroma,
+          periodicityBpm: frame.periodicityBpm,
+          periodicityEvidence: frame.periodicityEvidence,
+          pulsePhase: frame.pulsePhase,
+          rhythmEvidenceSeconds: frame.rhythmEvidenceSeconds,
+          recurrence: frame.recurrence,
+          similarityCount: frame.selfSimilarityCount,
+          analysisRateHz: frame.analysisRateHz,
+          sampleRate: frame.sampleRate,
+          fftSize: frame.fftSize,
           silent: frame.isSilent,
           fps: measuredFps,
         });
@@ -287,19 +322,34 @@ export function VisualizerCanvas({
       emitTelemetry(frame, timestampMs);
     };
 
-    const renderFrame = (updateFeatures: boolean, timestampMs: number) => {
+    const renderFrame = (animated: boolean, timestampMs: number) => {
       if (!bus) return;
 
-      const frame = updateFeatures || bus.frame.sequence === 0
-        ? bus.update(analysisClockMs)
-        : bus.frame;
+      const frame = bus.frame;
       const currentSettings = effectiveSettingsRef.current;
       const currentOutputMode = outputModeSignal?.current ?? outputModeRef.current;
       canvas.dataset.outputMode = currentOutputMode;
+      canvas.dataset.analysisSource = mode === "demo" ? "synthetic-preview" : "measured";
+      canvas.dataset.analysisSequence = String(frame.sequence);
+      canvas.dataset.scene = currentSettings.scene;
+      canvas.dataset.levelDbFs = frame.levelDbFs.toFixed(3);
+      canvas.dataset.peakLinear = frame.peak.toFixed(4);
+      canvas.dataset.crestFactor = frame.crestFactor.toFixed(4);
+      canvas.dataset.zeroCrossingRate = frame.zeroCrossingRate.toFixed(4);
+      canvas.dataset.centroidHz = frame.spectralCentroidHz.toFixed(2);
+      canvas.dataset.rolloffHz = frame.spectralRolloffHz.toFixed(2);
+      canvas.dataset.highFrequencyRatio = frame.highFrequencyRatio.toFixed(4);
+      canvas.dataset.onsetStrength = frame.onsetStrength.toFixed(4);
+      canvas.dataset.periodicityBpm = frame.periodicityBpm.toFixed(2);
+      canvas.dataset.periodicityEvidence = frame.periodicityEvidence.toFixed(4);
+      canvas.dataset.chromaConcentration = frame.chromaConcentration.toFixed(4);
+      canvas.dataset.dominantChroma = String(frame.dominantChroma);
+      canvas.dataset.recurrence = frame.recurrence.toFixed(4);
+      canvas.dataset.similarityCount = String(frame.selfSimilarityCount);
       syncBackingDimensions(canvas, currentSettings, currentOutputMode);
       renderer.render(frame, currentSettings, readShaderTime(frame));
 
-      if (updateFeatures) reportAnimatedFrame(frame, timestampMs);
+      if (animated) reportAnimatedFrame(frame, timestampMs);
       else reportStillFrame(frame, timestampMs);
     };
 
@@ -308,15 +358,69 @@ export function VisualizerCanvas({
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
       }
-      previousAnimationTimestampMs = null;
+    };
+
+    const stopAnalysis = () => {
+      if (analysisTimerId !== null) {
+        window.clearInterval(analysisTimerId);
+        analysisTimerId = null;
+      }
+      lastAnalysisWallTimestampMs = null;
     };
 
     const failRuntime = (error: unknown) => {
       if (failed) return;
       failed = true;
       stopAnimation();
+      stopAnalysis();
       canvas.dataset.visualizerState = "error";
       console.error("The visualizer render loop stopped after an error.", error);
+    };
+
+    const runAnalysis = (wallTimestampMs = nowMilliseconds()) => {
+      if (!bus || disposed || failed) return;
+
+      if (bus.frame.sequence === 0) {
+        lastAnalysisWallTimestampMs = wallTimestampMs;
+        bus.update(analysisClockMs);
+        return;
+      }
+
+      if (lastAnalysisWallTimestampMs === null) {
+        lastAnalysisWallTimestampMs = wallTimestampMs;
+        return;
+      }
+
+      const elapsedMs = Math.min(
+        MAX_ANALYSIS_STEP_MS,
+        Math.max(0, wallTimestampMs - lastAnalysisWallTimestampMs),
+      );
+      lastAnalysisWallTimestampMs = wallTimestampMs;
+      analysisClockMs += elapsedMs;
+      bus.update(analysisClockMs);
+    };
+
+    const scheduleAnalysis = () => {
+      if (
+        disposed ||
+        failed ||
+        !bus ||
+        analysisTimerId !== null ||
+        !activeRef.current ||
+        contextLost ||
+        document.hidden
+      ) {
+        return;
+      }
+
+      runAnalysis();
+      analysisTimerId = window.setInterval(() => {
+        try {
+          runAnalysis();
+        } catch (error) {
+          failRuntime(error);
+        }
+      }, ANALYSIS_INTERVAL_MS);
     };
 
     const renderStill = () => {
@@ -340,21 +444,14 @@ export function VisualizerCanvas({
       ) {
         return;
       }
-      previousAnimationTimestampMs = nowMilliseconds();
       animationFrameId = requestAnimationFrame(animate);
     };
 
     function animate(timestampMs: number): void {
       animationFrameId = null;
       if (disposed || failed || !activeRef.current || document.hidden) {
-        previousAnimationTimestampMs = null;
         return;
       }
-
-      if (previousAnimationTimestampMs !== null) {
-        analysisClockMs += Math.max(0, timestampMs - previousAnimationTimestampMs);
-      }
-      previousAnimationTimestampMs = timestampMs;
 
       if (
         reducedMotionRef.current &&
@@ -377,13 +474,25 @@ export function VisualizerCanvas({
 
     const runtime: CanvasRuntime = {
       renderStill,
+      resetAnalysis() {
+        if (!bus) return;
+        bus.reset();
+        renderer.reset();
+        analysisClockMs = 0;
+        lastAnalysisWallTimestampMs = null;
+        lastPlaybackTimeSeconds = 0;
+        measuredFps = 0;
+        renderStill();
+      },
       setActive(nextActive) {
         if (nextActive) {
           telemetryWindowStartedMs = nowMilliseconds();
           telemetryWindowFrames = 0;
+          scheduleAnalysis();
           scheduleAnimation();
         } else {
           stopAnimation();
+          stopAnalysis();
           measuredFps = 0;
           renderStill();
         }
@@ -391,11 +500,14 @@ export function VisualizerCanvas({
     };
     runtimeRef.current = runtime;
     if (renderNowRef) renderNowRef.current = renderStill;
+    if (resetAnalysisRef) resetAnalysisRef.current = runtime.resetAnalysis;
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
         stopAnimation();
+        stopAnalysis();
       } else if (activeRef.current) {
+        scheduleAnalysis();
         scheduleAnimation();
       } else {
         renderStill();
@@ -407,6 +519,7 @@ export function VisualizerCanvas({
       event.preventDefault();
       contextLost = true;
       stopAnimation();
+      stopAnalysis();
       canvas.dataset.visualizerState = "recovering";
     };
     const handleContextRestored = () => {
@@ -419,6 +532,7 @@ export function VisualizerCanvas({
         contextLost = false;
         failed = false;
         renderStill();
+        scheduleAnalysis();
         scheduleAnimation();
       } catch (error) {
         failRuntime(error);
@@ -434,11 +548,15 @@ export function VisualizerCanvas({
     else window.addEventListener("resize", renderStill, { passive: true });
 
     renderStill();
-    if (activeRef.current) scheduleAnimation();
+    if (activeRef.current) {
+      scheduleAnalysis();
+      scheduleAnimation();
+    }
 
     return () => {
       disposed = true;
       stopAnimation();
+      stopAnalysis();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       canvas.removeEventListener("webglcontextlost", handleContextLost);
       canvas.removeEventListener("webglcontextrestored", handleContextRestored);
@@ -446,19 +564,47 @@ export function VisualizerCanvas({
       else window.removeEventListener("resize", renderStill);
       if (runtimeRef.current === runtime) runtimeRef.current = null;
       if (renderNowRef?.current === renderStill) renderNowRef.current = null;
+      if (resetAnalysisRef?.current === runtime.resetAnalysis) {
+        resetAnalysisRef.current = null;
+      }
       bus?.dispose();
       renderer.dispose();
       delete canvas.dataset.renderer;
       delete canvas.dataset.visualizerState;
       delete canvas.dataset.outputMode;
+      delete canvas.dataset.analysisSource;
+      delete canvas.dataset.analysisSequence;
+      delete canvas.dataset.scene;
+      delete canvas.dataset.levelDbFs;
+      delete canvas.dataset.peakLinear;
+      delete canvas.dataset.crestFactor;
+      delete canvas.dataset.zeroCrossingRate;
+      delete canvas.dataset.centroidHz;
+      delete canvas.dataset.rolloffHz;
+      delete canvas.dataset.highFrequencyRatio;
+      delete canvas.dataset.onsetStrength;
+      delete canvas.dataset.periodicityBpm;
+      delete canvas.dataset.periodicityEvidence;
+      delete canvas.dataset.chromaConcentration;
+      delete canvas.dataset.dominantChroma;
+      delete canvas.dataset.recurrence;
+      delete canvas.dataset.similarityCount;
     };
-  }, [analyserRef, canvasRef, mode, outputModeSignal, renderNowRef, sourceRevision]);
+  }, [
+    analyserRef,
+    canvasRef,
+    mode,
+    outputModeSignal,
+    renderNowRef,
+    resetAnalysisRef,
+    sourceRevision,
+  ]);
 
   const aspect = findAspect(settings.aspect);
   const stateLabel = active ? "active" : "paused";
   const contentLabel = mode === "demo"
-    ? `Demo audio visualization, ${stateLabel}`
-    : `Live audio visualization, ${stateLabel}`;
+    ? `Synthetic feature preview, not measured audio, ${stateLabel}`
+    : `Measured audio visualization, ${stateLabel}`;
 
   return (
     <canvas

@@ -31,9 +31,24 @@ const INITIAL_TELEMETRY: Telemetry = {
   renderer: "canvas2d",
   energy: 0,
   peak: 0,
-  flux: 0,
+  crestFactor: 0,
+  levelDbFs: -100,
+  zeroCrossingRate: 0,
+  onsetStrength: 0,
   centroidHz: 0,
   rolloffHz: 0,
+  highFrequencyRatio: 0,
+  chromaConcentration: 0,
+  dominantChroma: -1,
+  periodicityBpm: 0,
+  periodicityEvidence: 0,
+  pulsePhase: 0,
+  rhythmEvidenceSeconds: 0,
+  recurrence: 0,
+  similarityCount: 0,
+  analysisRateHz: 50,
+  sampleRate: 0,
+  fftSize: 0,
   silent: true,
   fps: 0,
 };
@@ -97,6 +112,8 @@ export function AudioVisualizerStudio() {
     waveformPeaks,
     error: audioError,
     isLive,
+    captureSettings,
+    sourceDetails,
     loadFile,
     startSystemCapture: beginSystemCapture,
     startMicrophone: beginMicrophone,
@@ -116,6 +133,7 @@ export function AudioVisualizerStudio() {
   const keyboardActionsRef = useRef<KeyboardActions>(INITIAL_KEYBOARD_ACTIONS);
   const outputModeSignalRef = useRef<"preview" | "export">("preview");
   const renderNowRef = useRef<(() => void) | null>(null);
+  const resetAnalysisRef = useRef<(() => void) | null>(null);
 
   const [settings, setSettings] = useState<VisualSettings>(DEFAULT_VISUAL_SETTINGS);
   const [telemetry, setTelemetry] = useState<Telemetry>(INITIAL_TELEMETRY);
@@ -125,6 +143,16 @@ export function AudioVisualizerStudio() {
   const [outputPrimed, setOutputPrimed] = useState(false);
   const [demoPaused, setDemoPaused] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
+
+  const seekWithAnalysisReset = useCallback((timeSeconds: number) => {
+    resetAnalysisRef.current?.();
+    seek(timeSeconds);
+  }, [seek]);
+
+  const stopWithAnalysisReset = useCallback(() => {
+    resetAnalysisRef.current?.();
+    stop();
+  }, [stop]);
 
   const {
     status: recorderStatus,
@@ -148,7 +176,7 @@ export function AudioVisualizerStudio() {
     getCaptureStream,
     play,
     pause,
-    seek,
+    seek: seekWithAnalysisReset,
   });
 
   const updateSettings = useCallback((patch: Partial<VisualSettings>) => {
@@ -190,6 +218,7 @@ export function AudioVisualizerStudio() {
 
   const exitStudio = useCallback(() => {
     cancelRecording();
+    resetAnalysisRef.current?.();
     outputModeSignalRef.current = "preview";
     setOutputPrimed(false);
     setExportOpen(false);
@@ -250,8 +279,15 @@ export function AudioVisualizerStudio() {
       setDemoPaused((paused) => !paused);
       return;
     }
+    if (sourceMode === "file" && !isPlaying) {
+      const audioElement = audioRef.current;
+      const playbackPosition = audioElement?.currentTime ?? currentTime;
+      const replayingFromEnd = Boolean(audioElement?.ended)
+        || (duration > 0 && playbackPosition >= duration - 0.05);
+      if (replayingFromEnd) resetAnalysisRef.current?.();
+    }
     return togglePlayback();
-  }, [hasSource, togglePlayback]);
+  }, [audioRef, currentTime, duration, hasSource, isPlaying, sourceMode, togglePlayback]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -341,6 +377,7 @@ export function AudioVisualizerStudio() {
       className="stage-canvas"
       outputModeSignal={outputModeSignalRef}
       renderNowRef={renderNowRef}
+      resetAnalysisRef={resetAnalysisRef}
       outputMode={
         (outputPrimed &&
           recorderStatus !== "ready" &&
@@ -388,6 +425,10 @@ export function AudioVisualizerStudio() {
             />
             <InspectorPanel
               settings={settings}
+              telemetry={telemetry}
+              sourceMode={sourceMode}
+              captureSettings={captureSettings}
+              sourceDetails={sourceDetails}
               onChange={updateSettings}
               onReset={() => setSettings(DEFAULT_VISUAL_SETTINGS)}
             />
@@ -399,9 +440,9 @@ export function AudioVisualizerStudio() {
             duration={duration}
             peaks={waveformPeaks}
             accent={palette.css[0]}
-            onPlayPause={() => void togglePlayback()}
-            onStop={stop}
-            onSeek={seek}
+            onPlayPause={() => void togglePrimaryPlayback()}
+            onStop={stopWithAnalysisReset}
+            onSeek={seekWithAnalysisReset}
             onChangeSource={exitStudio}
           />
           {error ? <div className="studio-error-banner" role="alert">{error}</div> : null}
