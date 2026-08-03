@@ -4,6 +4,7 @@ import { Icon, SignalMark } from "./Icons";
 interface StudioHeaderProps {
   fileName: string;
   sourceMode: SourceMode;
+  isReferenceSignal: boolean;
   isPlaying: boolean;
   onExit: () => void;
   onSnapshot: () => void;
@@ -20,6 +21,7 @@ function modeName(mode: SourceMode): string {
 export function StudioHeader({
   fileName,
   sourceMode,
+  isReferenceSignal,
   isPlaying,
   onExit,
   onSnapshot,
@@ -28,28 +30,31 @@ export function StudioHeader({
 }: StudioHeaderProps) {
   return (
     <header className="studio-header">
-      <button type="button" className="studio-brand" onClick={onExit} aria-label="Return to source picker">
-        <SignalMark size={32} />
-        <span>AUDIO / VISUALIZER</span>
-        <small>AV.01</small>
+      <button type="button" className="studio-brand" onClick={onExit} aria-label="Change audio source">
+        <SignalMark size={24} />
+        <span>AV / 01</span>
+        <small>
+          <Icon name="arrow-left" size={11} />
+          CHANGE SOURCE
+        </small>
       </button>
       <div className="studio-source-title">
         <span className={`source-state${isPlaying ? " is-active" : ""}`} />
         <div>
           <strong title={fileName}>{fileName || "Untitled signal"}</strong>
-          <small>{modeName(sourceMode)} SOURCE · LOCAL SESSION</small>
+          <small>{isReferenceSignal ? "BUILT-IN REFERENCE" : `${modeName(sourceMode)} SOURCE`} · LOCAL SESSION</small>
         </div>
       </div>
       <div className="studio-actions">
-        <button type="button" className="icon-button" onClick={onSnapshot} aria-label="Save a PNG snapshot" data-tooltip="Snapshot">
+        <button type="button" className="icon-button" onClick={onSnapshot} aria-label="Save a PNG snapshot">
           <Icon name="camera" />
         </button>
-        <button type="button" className="icon-button" onClick={onFullscreen} aria-label="Open visualizer fullscreen" data-tooltip="Fullscreen">
+        <button type="button" className="icon-button" onClick={onFullscreen} aria-label="Open visualizer fullscreen">
           <Icon name="expand" />
         </button>
         <button type="button" className="export-button" onClick={onExport}>
           <Icon name="download" size={18} />
-          EXPORT
+          RENDER
         </button>
       </div>
     </header>

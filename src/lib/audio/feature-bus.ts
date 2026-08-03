@@ -296,6 +296,8 @@ export class AudioFeatureBus implements FeatureBus {
       spectralCentroid: 0,
       spectralRolloffHz: 0,
       spectralRolloff: 0,
+      highFrequencyCutoffHz: this.options.highFrequencyCutoffHz,
+      spectralRolloffPercent: this.options.rolloffPercent,
       highFrequencyRatio: 0,
       onsetStrength: 0,
       spectralFluxRaw: 0,
@@ -901,12 +903,32 @@ export class AudioFeatureBus implements FeatureBus {
   private downsampleWaveform(): void {
     const waveform = this.mutableFrame.waveform;
     const source = this.timeDomain;
-    for (let point = 0; point < WAVEFORM_SIZE; point += 1) {
-      const start = Math.floor((point * source.length) / WAVEFORM_SIZE);
-      const end = Math.max(start + 1, Math.floor(((point + 1) * source.length) / WAVEFORM_SIZE));
-      let sum = 0;
-      for (let index = start; index < end; index += 1) sum += source[index];
-      waveform[point] = clamp(sum / (end - start), -1, 1);
+    const blockCount = WAVEFORM_SIZE / 2;
+    for (let block = 0; block < blockCount; block += 1) {
+      const start = Math.floor((block * source.length) / blockCount);
+      const end = Math.max(start + 1, Math.floor(((block + 1) * source.length) / blockCount));
+      let minimum = Number.POSITIVE_INFINITY;
+      let maximum = Number.NEGATIVE_INFINITY;
+      let minimumIndex = start;
+      let maximumIndex = start;
+      for (let index = start; index < end; index += 1) {
+        const sample = source[index];
+        if (sample < minimum) {
+          minimum = sample;
+          minimumIndex = index;
+        }
+        if (sample > maximum) {
+          maximum = sample;
+          maximumIndex = index;
+        }
+      }
+
+      // Preserve extrema in temporal order. Unlike block means, this cannot
+      // erase a strong tone merely because the block spans whole cycles.
+      const first = minimumIndex <= maximumIndex ? minimum : maximum;
+      const second = minimumIndex <= maximumIndex ? maximum : minimum;
+      waveform[block * 2] = clamp(first, -1, 1);
+      waveform[block * 2 + 1] = clamp(second, -1, 1);
     }
   }
 

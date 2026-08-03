@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
@@ -117,8 +118,10 @@ test("landing experience is hydrated, explicit, and responsive", async ({ page }
   await page.goto("/");
 
   await expect(page).toHaveTitle("AV/01 — Audio Visualizer");
-  await expect(page.getByRole("heading", { name: "Sound, seen." })).toBeVisible();
-  await expect(page.getByText("ILLUSTRATIVE · NOT MEASURED")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Five views. One signal." })).toBeVisible();
+  await expect(page.getByText("NOT A MEASUREMENT")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start with a known change." })).toBeVisible();
+  await expect(page.locator('[data-brand-mark="av01-signal"]')).toHaveCount(1);
 
   const stage = page.locator("canvas.stage-canvas");
   await expect(stage).toHaveAttribute("data-analysis-source", "synthetic-preview");
@@ -132,7 +135,10 @@ test("landing experience is hydrated, explicit, and responsive", async ({ page }
 
   const opticalSystem = await page.evaluate(() => {
     const root = getComputedStyle(document.documentElement);
-    const primaryAction = document.querySelector<HTMLElement>(".source-card-primary .source-icon");
+    const primaryAction = document.querySelector<HTMLElement>(".source-primary");
+    const displayHeading = document.querySelector<HTMLElement>(".entry-copy h1");
+    const eyebrow = document.querySelector<HTMLElement>(".entry-shell .eyebrow");
+    const mutedCopy = document.querySelector<HTMLElement>(".privacy-note");
     const actionStyle = primaryAction ? getComputedStyle(primaryAction) : null;
     return {
       black: root.getPropertyValue("--ink").trim(),
@@ -140,15 +146,25 @@ test("landing experience is hydrated, explicit, and responsive", async ({ page }
       electricBlue: root.getPropertyValue("--electric-blue").trim(),
       actionBackground: actionStyle?.backgroundColor,
       actionText: actionStyle?.color,
+      actionRadius: actionStyle?.borderRadius,
+      bodyFont: getComputedStyle(document.body).fontFamily,
+      displayFont: displayHeading ? getComputedStyle(displayHeading).fontFamily : "",
+      eyebrowText: eyebrow ? getComputedStyle(eyebrow).color : "",
+      mutedText: mutedCopy ? getComputedStyle(mutedCopy).color : "",
     };
   });
-  expect(opticalSystem).toEqual({
+  expect(opticalSystem).toMatchObject({
     black: "#000000",
     white: "#ffffff",
     electricBlue: "#008cff",
     actionBackground: "rgb(0, 140, 255)",
     actionText: "rgb(0, 0, 0)",
+    actionRadius: "0px",
+    eyebrowText: "rgb(0, 0, 0)",
+    mutedText: "rgba(0, 0, 0, 0.58)",
   });
+  expect(opticalSystem.bodyFont).toContain("DM Mono");
+  expect(opticalSystem.displayFont).toContain("Unbounded");
 
   await page.getByRole("button", { name: "Pause demo visualization" }).click();
   await expect(page.getByRole("button", { name: "Play demo visualization" })).toBeVisible();
@@ -156,6 +172,65 @@ test("landing experience is hydrated, explicit, and responsive", async ({ page }
   await page.setViewportSize({ width: 390, height: 844 });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+
+  await page.getByRole("button", {
+    name: "Open A–B–A–C sequence in Recurrence Atlas",
+  }).click();
+  await expect(stage).toHaveAttribute("data-scene", "contour");
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  const activeScenePosition = await page.evaluate(() => {
+    const rail = document.querySelector(".scene-list");
+    const active = document.querySelector(".scene-button.is-active");
+    if (!rail || !active) return null;
+    const railRect = rail.getBoundingClientRect();
+    const activeRect = active.getBoundingClientRect();
+    return {
+      railLeft: railRect.left,
+      railRight: railRect.right,
+      activeLeft: activeRect.left,
+      activeRight: activeRect.right,
+    };
+  });
+  expect(activeScenePosition).not.toBeNull();
+  expect(activeScenePosition!.activeLeft).toBeGreaterThanOrEqual(activeScenePosition!.railLeft);
+  expect(activeScenePosition!.activeRight).toBeLessThanOrEqual(activeScenePosition!.railRight);
+  expect(failures).toEqual([]);
+});
+
+test("built-in references use the measured path with explicit provenance", async ({ page }) => {
+  const failures = captureRuntimeFailures(page);
+  await page.goto("/");
+
+  await page.getByRole("button", {
+    name: "Open Low / high tone in Auditory Field",
+  }).click();
+
+  const stage = page.locator("canvas.stage-canvas");
+  await expect(stage).toHaveAttribute("data-scene", "field");
+  await expect(stage).toHaveAttribute("data-analysis-source", "measured");
+  await expect(stage).toHaveAttribute("data-source-provenance", "built-in-reference");
+  await expect(page.getByText("BUILT-IN REFERENCE").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Low / high tone" })).toBeVisible();
+  await expect(page.locator('[data-brand-mark="av01-signal"]')).toHaveCount(1);
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#000000");
+
+  await page.getByRole("button", { name: "Play audio" }).click();
+  await expect.poll(
+    async () => Number(await stage.getAttribute("data-analysis-sequence")),
+  ).toBeGreaterThan(2);
+
+  await page.getByRole("button", { name: "Change audio source" }).click();
+  await expect(page.getByRole("heading", { name: "Five views. One signal." })).toBeVisible();
+
+  // A user file that happens to share the generated filename must not inherit
+  // built-in provenance from its name.
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "reference-01-low-high-spectrum.wav",
+    mimeType: "audio/wav",
+    buffer: readFileSync(path.join(FIXTURE_DIRECTORY, "tone-375hz-rms025.wav")),
+  });
+  await expect(stage).toHaveAttribute("data-source-provenance", "user-source");
+  await expect(page.getByText("BUILT-IN REFERENCE")).toHaveCount(0);
   expect(failures).toEqual([]);
 });
 
@@ -175,11 +250,13 @@ test("measured frames remain complete and controls keep native keyboard behavior
   await expect(stage).toHaveAttribute("data-scene", "trace");
   await expect(page.getByRole("radio", { name: "Temporal Scope" })).toBeFocused();
 
+  await page.locator("summary").filter({ hasText: "Frame & comfort" }).click();
   const landscape = page.getByRole("radio", { name: "16:9" });
   await landscape.focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("radio", { name: "1:1" })).toBeChecked();
   await expect(page.getByRole("radio", { name: "1:1" })).toBeFocused();
+  await expect(page.getByRole("radio", { name: "1:1" })).toHaveCSS("border-top-width", "2px");
 
   await landscape.click();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -247,7 +324,7 @@ test("sustained tone remains spectral evidence, never a periodicity claim", asyn
   for (const [label, scene, claimId] of scenes) {
     await page.getByRole("radio", { name: label }).click();
     await expect(stage).toHaveAttribute("data-scene", scene);
-    await expect(page.getByRole("region", { name: new RegExp(claimId) })).toBeVisible();
+    await expect(page.getByText(claimId, { exact: true })).toBeVisible();
   }
 
   await page.getByRole("button", { name: "Stop audio" }).click();
@@ -295,12 +372,6 @@ test("periodic transients separate from the matched aperiodic control", async ({
       2,
     ),
     contentType: "application/json",
-  });
-  console.log("RHYTHM_E2E", {
-    periodicBpm,
-    periodicEvidence,
-    periodicCandidates,
-    aperiodicEvidence,
   });
   expect(failures).toEqual([]);
 });

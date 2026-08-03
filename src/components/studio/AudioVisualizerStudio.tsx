@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -11,9 +12,14 @@ import {
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { useCanvasRecorder } from "@/hooks/useCanvasRecorder";
 import {
+  createReferenceSignalFile,
+  findReferenceSignal,
+  type ReferenceSignalId,
+} from "@/lib/audio/reference-signals";
+import {
+  BRAND_PIGMENTS,
   DEFAULT_VISUAL_SETTINGS,
   SCENES,
-  findOpticalSystem,
   type SceneId,
   type VisualSettings,
 } from "@/lib/visualizer/types";
@@ -37,6 +43,8 @@ const INITIAL_TELEMETRY: Telemetry = {
   onsetStrength: 0,
   centroidHz: 0,
   rolloffHz: 0,
+  highFrequencyCutoffHz: 3_000,
+  rolloffPercent: 0.85,
   highFrequencyRatio: 0,
   chromaConcentration: 0,
   dominantChroma: -1,
@@ -164,6 +172,8 @@ export function AudioVisualizerStudio() {
   const [exportOpen, setExportOpen] = useState(false);
   const [outputPrimed, setOutputPrimed] = useState(false);
   const [demoPaused, setDemoPaused] = useState(false);
+  const [loadingReference, setLoadingReference] = useState<ReferenceSignalId | null>(null);
+  const [activeReferenceId, setActiveReferenceId] = useState<ReferenceSignalId | null>(null);
   const [uiError, setUiError] = useState<string | null>(null);
 
   const seekWithAnalysisReset = useCallback((timeSeconds: number) => {
@@ -205,18 +215,42 @@ export function AudioVisualizerStudio() {
     setSettings((current) => ({ ...current, ...patch }));
   }, []);
 
-  const finishSourceChange = useCallback(() => {
+  const finishSourceChange = useCallback((referenceId: ReferenceSignalId | null = null) => {
     setTelemetry(INITIAL_TELEMETRY);
     setSourceRevision((revision) => revision + 1);
+    setActiveReferenceId(referenceId);
     setUiError(null);
   }, []);
 
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [hasSource, sourceRevision]);
+
   const importFile = useCallback(
-    async (file: File) => {
+    async (file: File, referenceId: ReferenceSignalId | null = null) => {
       const loaded = await loadFile(file);
-      if (loaded) finishSourceChange();
+      if (loaded) finishSourceChange(referenceId);
+      return loaded;
     },
     [finishSourceChange, loadFile],
+  );
+
+  const openReferenceSignal = useCallback(
+    async (id: ReferenceSignalId) => {
+      const reference = findReferenceSignal(id);
+      setLoadingReference(id);
+      setUiError(null);
+      try {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        const loaded = await importFile(createReferenceSignalFile(id), id);
+        if (loaded) updateSettings({ scene: reference.scene });
+      } catch {
+        setUiError("The reference signal could not be generated in this browser.");
+      } finally {
+        setLoadingReference(null);
+      }
+    },
+    [importFile, updateSettings],
   );
 
   const startSystemCapture = useCallback(async () => {
@@ -244,6 +278,8 @@ export function AudioVisualizerStudio() {
     outputModeSignalRef.current = "preview";
     setOutputPrimed(false);
     setExportOpen(false);
+    setLoadingReference(null);
+    setActiveReferenceId(null);
     resetAudio();
     setSourceRevision((revision) => revision + 1);
     setTelemetry(INITIAL_TELEMETRY);
@@ -404,6 +440,7 @@ export function AudioVisualizerStudio() {
       analyserRef={analyserRef}
       settings={settings}
       mode={hasSource ? "live" : "demo"}
+      sourceProvenance={activeReferenceId ? "built-in-reference" : "user-source"}
       active={hasSource ? isPlaying : !demoPaused}
       sourceRevision={sourceRevision}
       getPlaybackTime={getPlaybackTime}
@@ -424,9 +461,15 @@ export function AudioVisualizerStudio() {
     />
   );
 
-  const busy = audioStatus === "loading";
+  const busy = audioStatus === "loading" || loadingReference !== null;
   const error = uiError ?? audioError;
-  const opticalSystem = findOpticalSystem(settings.opticalSystem);
+  const activeReference = activeReferenceId ? findReferenceSignal(activeReferenceId) : null;
+
+  useEffect(() => {
+    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!themeColor) return;
+    themeColor.content = hasSource ? BRAND_PIGMENTS.background : BRAND_PIGMENTS.reference;
+  }, [hasSource]);
 
   return (
     <div
@@ -440,44 +483,43 @@ export function AudioVisualizerStudio() {
           <StudioHeader
             fileName={fileName ?? (isLive ? "Live signal" : "Untitled signal")}
             sourceMode={sourceMode}
+            isReferenceSignal={activeReference !== null}
             isPlaying={isPlaying}
             onExit={exitStudio}
             onSnapshot={takeSnapshot}
             onFullscreen={requestFullscreen}
             onExport={openExport}
           />
-          <div className="studio-workspace">
-            <SceneRail value={settings.scene} onChange={selectScene} />
-            <StudioStage
-              containerRef={stageRef}
-              visualizer={visualizer}
-              settings={settings}
-              telemetry={telemetry}
-              sourceMode={sourceMode}
-              fileName={fileName ?? "Live signal"}
-              isPlaying={isPlaying}
-            />
-            <InspectorPanel
-              settings={settings}
-              telemetry={telemetry}
-              sourceMode={sourceMode}
-              captureSettings={captureSettings}
-              sourceDetails={sourceDetails}
-              onChange={updateSettings}
-              onReset={() => setSettings(DEFAULT_VISUAL_SETTINGS)}
-            />
-          </div>
+          <SceneRail value={settings.scene} onChange={selectScene} />
+          <StudioStage
+            containerRef={stageRef}
+            visualizer={visualizer}
+            settings={settings}
+            telemetry={telemetry}
+            sourceMode={sourceMode}
+            isReferenceSignal={activeReference !== null}
+            fileName={fileName ?? "Live signal"}
+            isPlaying={isPlaying}
+          />
           <TransportBar
             sourceMode={sourceMode}
             isPlaying={isPlaying}
             currentTime={currentTime}
             duration={duration}
             peaks={waveformPeaks}
-            accent={opticalSystem.css[0]}
             onPlayPause={() => void togglePrimaryPlayback()}
             onStop={stopWithAnalysisReset}
             onSeek={seekWithAnalysisReset}
-            onChangeSource={exitStudio}
+          />
+          <InspectorPanel
+            settings={settings}
+            telemetry={telemetry}
+            sourceMode={sourceMode}
+            captureSettings={captureSettings}
+            sourceDetails={sourceDetails}
+            referenceSignal={activeReference}
+            onChange={updateSettings}
+            onReset={() => setSettings(DEFAULT_VISUAL_SETTINGS)}
           />
           {error ? <div className="studio-error-banner" role="alert">{error}</div> : null}
         </main>
@@ -487,9 +529,11 @@ export function AudioVisualizerStudio() {
           telemetry={telemetry}
           demoPaused={demoPaused}
           busy={busy}
+          loadingReference={loadingReference}
           error={error}
           onToggleDemo={() => setDemoPaused((paused) => !paused)}
           onChooseFile={() => fileInputRef.current?.click()}
+          onChooseReference={(id) => void openReferenceSignal(id)}
           onSystemCapture={() => void startSystemCapture()}
           onMicrophone={() => void startMicrophone()}
         />

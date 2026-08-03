@@ -11,7 +11,6 @@ export type IconName =
   | "pause"
   | "play"
   | "screen"
-  | "sliders"
   | "stop"
   | "upload";
 
@@ -98,15 +97,6 @@ export function Icon({ name, size = 20, ...props }: IconProps) {
       </svg>
     );
   }
-  if (name === "sliders") {
-    return (
-      <svg {...common} {...props}>
-        <path d="M4 7h6M14 7h6M4 17h10M18 17h2" />
-        <circle cx="12" cy="7" r="2" />
-        <circle cx="16" cy="17" r="2" />
-      </svg>
-    );
-  }
   if (name === "arrow-left") {
     return (
       <svg {...common} {...props}>
@@ -133,7 +123,15 @@ export function Icon({ name, size = 20, ...props }: IconProps) {
 
 export function SignalMark({ size = 38 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 40 40"
+      fill="none"
+      aria-hidden="true"
+      data-brand-mark="av01-signal"
+      focusable="false"
+    >
       <circle cx="20" cy="20" r="16.5" stroke="currentColor" strokeWidth="1" opacity="0.32" />
       <path d="M4 20h7l2.6-8 5.2 17L24 8l3.7 12H36" stroke="currentColor" strokeWidth="1.7" />
       <circle cx="20" cy="20" r="3.2" fill="currentColor" />

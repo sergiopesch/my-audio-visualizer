@@ -6,6 +6,15 @@ export type OpticalSystemId = "electric";
 
 export type AspectId = "landscape" | "square" | "portrait";
 
+export const BRAND_PIGMENTS = {
+  background: "#000000",
+  signal: "#008CFF",
+  reference: "#FFFFFF",
+} as const;
+
+/** Minimum fixed-reference intensity over black; remains above 3:1 contrast. */
+export const REFERENCE_GEOMETRY_INTENSITY = 0.38;
+
 export interface VisualSettings {
   scene: SceneId;
   opticalSystem: OpticalSystemId;
@@ -40,12 +49,9 @@ export interface SceneDefinition {
 
 export interface OpticalSystemDefinition {
   id: OpticalSystemId;
-  name: string;
   background: readonly [number, number, number];
-  primary: readonly [number, number, number];
-  secondary: readonly [number, number, number];
-  accent: readonly [number, number, number];
-  css: readonly [string, string, string];
+  signal: readonly [number, number, number];
+  reference: readonly [number, number, number];
 }
 
 export interface AspectDefinition {
@@ -62,7 +68,7 @@ export const SCENES: readonly SceneDefinition[] = [
     index: 0,
     claimId: "AV01-SCI-001",
     name: "Auditory Field",
-    shortName: "Field",
+    shortName: "Spectrum",
     description: "A current spectrum grouped into 24 ERB-rate-spaced triangular regions.",
     mapping: "24 ERB bands form the field · centroid and rolloff remain explicit markers",
     representation: "ERB-spaced short-time RMS-like spectral magnitude",
@@ -81,7 +87,7 @@ export const SCENES: readonly SceneDefinition[] = [
     index: 1,
     claimId: "AV01-SCI-002",
     name: "Tonal Orbit",
-    shortName: "Orbit",
+    shortName: "Pitch class",
     description: "Octave-folded pitch-class energy arranged as twelve fixed sectors.",
     mapping: "12 chroma bins set sector radii · concentration and strongest class are annotated",
     representation: "Twelve-bin chroma (octave-folded pitch-class energy)",
@@ -95,10 +101,10 @@ export const SCENES: readonly SceneDefinition[] = [
     index: 2,
     claimId: "AV01-SCI-003",
     name: "Temporal Scope",
-    shortName: "Trace",
-    description: "A direct view of the recent mono time-domain signal and level descriptors.",
-    mapping: "Samples draw the trace · RMS and peak set rails · crest and zero crossings set gauges",
-    representation: "Recent mono waveform with RMS, peak, crest factor, and zero-crossing rate",
+    shortName: "Waveform",
+    description: "A peak-preserving view of the recent mono time-domain signal and level descriptors.",
+    mapping: "Time-ordered block extrema draw the trace · RMS and peak set rails · crest and zero crossings set gauges",
+    representation: "Peak-preserving min/max reduction of the recent mono waveform with RMS, peak, crest factor, and zero-crossing rate",
     question: "How is amplitude changing within the current analysis window?",
     limitation: "It is not calibrated SPL, LUFS, stereo phase, or an analog oscilloscope measurement.",
     primaryFeatures: ["waveform", "rms", "peak", "crestFactor", "zeroCrossingRate"],
@@ -109,7 +115,7 @@ export const SCENES: readonly SceneDefinition[] = [
     index: 3,
     claimId: "AV01-SCI-004",
     name: "Rhythm Lattice",
-    shortName: "Lattice",
+    shortName: "Periodicity",
     description: "Onset change and short-term periodicity shown with a heuristic evidence score.",
     mapping: "Onset strength excites the core · phase advances the lattice · evidence limits visibility",
     representation: "Spectral-change onset strength with short-term autocorrelation periodicity",
@@ -130,7 +136,7 @@ export const SCENES: readonly SceneDefinition[] = [
     index: 4,
     claimId: "AV01-SCI-005",
     name: "Recurrence Atlas",
-    shortName: "Contour",
+    shortName: "Similarity",
     description: "A rolling self-similarity matrix of normalized auditory spectral shape.",
     mapping: "Time runs on both axes · brighter cells are more similar · non-flat shapes identify with themselves on the diagonal",
     representation: "Cosine self-similarity of level-normalized log ERB-band vectors",
@@ -150,12 +156,9 @@ export const SCENES: readonly SceneDefinition[] = [
 export const OPTICAL_SYSTEMS: readonly OpticalSystemDefinition[] = [
   {
     id: "electric",
-    name: "Zero / Signal / Reference",
     background: [0, 0, 0],
-    primary: [0, 140 / 255, 1],
-    secondary: [1, 1, 1],
-    accent: [1, 1, 1],
-    css: ["#008CFF", "#FFFFFF", "#FFFFFF"],
+    signal: [0, 140 / 255, 1],
+    reference: [1, 1, 1],
   },
 ] as const;
 

@@ -4,29 +4,62 @@
 
 This record is the evidence behind the status language in the [scientific contract](SCIENCE.md). I am publishing the numbers because “tested” is not useful unless the controls, failures and boundaries are visible.
 
-The results below were recorded on 1 August 2026 against the scientific-analysis release candidate. They approve the five declared scene contracts for the deterministic and local-file paths tested here. They do **not** constitute peer review, a perceptual study, microphone calibration, metrological certification or approval by any cited author or standards body.
+The core measurements below were recorded on 1 August 2026 against the scientific-analysis release candidate. A 2 August addendum records the minimal-interface and built-in-reference release. Together they approve the five declared scene contracts for the deterministic, built-in-reference and local-file paths tested here. They do **not** constitute peer review, a perceptual study, microphone calibration, metrological certification or approval by any cited author or standards body.
 
 Recorded environment: macOS 26.6 (`arm64`), Codex in-app browser runtime (browser build version/user agent not exposed by the validation harness), 1280 × 720 viewport, final `WEBGL2` renderer at approximately 60–63 FPS, with the Canvas 2D fallback also exercised earlier. The analysis `AudioContext` and separately decoded file-overview buffer both reported 44.1 kHz.
 
 ## Automated evidence
 
-The release suite currently contains 38 deterministic tests across four unit-test files, plus four Chromium end-to-end tests:
+The release suite currently contains 51 deterministic tests across five unit-test files, plus five Chromium end-to-end tests:
 
-- 14 feature-bus tests for ERB layout, equal-RMS spectral separation, waveform descriptors, over-full-scale samples, polarity, chroma, tone-to-silence clearing, onset response, production-smoothed 120/200 BPM-equivalent periodicity, sustained-spectrum rejection, state identity and reset;
+- 15 feature-bus tests for ERB layout, equal-RMS spectral separation, waveform descriptors, over-full-scale samples, polarity, peak-preserving high-frequency waveform reduction, chroma, tone-to-silence clearing, onset response, production-smoothed 120/200 BPM-equivalent periodicity, sustained-spectrum rejection, state identity and reset;
 - 16 scientific-analysis tests for ERB transforms, pitch-class folding, entropy, production-smoothed 90/120/180/200 BPM-equivalent periodicity, an aperiodic control, constant and sub-threshold envelope rejection, one-shot transient hysteresis and rolling recurrence;
-- 4 scene-contract tests for non-overlapping feature ownership, visible limitations, WebGL evidence isolation and the absence of autonomous clocks, noise and grain.
+- 12 built-in-reference tests for scene coverage, deterministic mono PCM16 encoding and hashes, repeatable synthesis, matched RMS/peak controls, distinct crest factors, 0.5-second event spacing and gain-invariant A–B–A recurrence;
+- 4 scene-contract tests for non-overlapping feature ownership, visible limitations, WebGL evidence isolation and the absence of autonomous clocks, noise and grain;
 - 4 optical-system tests that enforce the exact black, `#008CFF` and white source pigments, reject undeclared colour literals and hue-shifting brightness filters, require scalar shader tone mapping, and verify the required foreground/background contrast pairs;
-- 4 Chromium end-to-end tests for hydration/provenance/mobile overflow, native radiogroup keyboard behavior, measured-frame containment and ordering, the sustained-tone negative control, all five scene routes, stop/reset and the periodic-versus-jittered transient control.
+- 5 Chromium end-to-end tests for hydration and responsive layout, built-in/user provenance isolation (including a same-filename adversarial case), native radiogroup keyboard behavior, measured-frame containment and ordering, the sustained-tone negative control, all five scene routes, stop/reset and the periodic-versus-jittered transient control.
+
+## 2 August 2026 minimal-reference addendum
+
+The latest release adds five browser-generated reference signals without introducing a parallel analysis path. Selecting one synthesizes a deterministic 48 kHz mono PCM16 WAV, wraps it in a `File`, and sends it through the same decode, `AnalyserNode`, feature-bus and renderer path as a user file. Provenance is held as explicit application state, rather than inferred from a filename; an end-to-end regression verifies that a user file deliberately given a built-in filename remains labelled `user-source`.
+
+Each signal is a compact within-file control that varies a declared input while publishing the properties held fixed: equal-RMS register alternation, octave-related A tones, equal-peak waveform families, a 0.5-second transient grid, and gain-changed A–B–A–C recurrence. The references demonstrate established signal-analysis relationships; they are teaching controls, not proof that a particular visual encoding improves human perception.
+
+The waveform renderer now receives time-ordered block minima and maxima instead of block means. A deterministic 6 kHz regression at 48 kHz verifies that the reduced trace retains approximately ±0.69 amplitude instead of cancelling toward zero. The Auditory Field cutoff annotation is derived from the configured cutoff and Nyquist limit, and the recurrence frontier is rendered independently of the recurrence score so absence of similarity cannot erase the population boundary.
+
+The minimal interface was inspected in the Codex in-app browser at 1440 × 900 and 390 × 844. The desktop reference library displayed all five controls in one row; the mobile library used an intentional horizontal carousel. The selected reference opened at the top of the studio, with the stage, transport and inspector in visual and focus order, no horizontal document overflow, measured-frame provenance intact, WebGL 2 active and no browser console warnings or errors. This is a targeted responsive pass, not the open cross-browser and assistive-technology matrix.
+
+The subsequent brand-consistency pass made the three roles explicit in code as background, signal and reference rather than interchangeable primary/secondary/accent slots. It fixed the intended Unbounded/DM Mono font variables, reserves electric-blue-on-white for large text and non-text accents, raises small light-surface copy above 4.5:1, and renders 38% white reference geometry after presentation tone mapping so its contrast remains above 3:1. Selected frame controls now also change border weight, source transitions reset mobile scroll after the studio commits, and the active scene is centered inside the mobile rail.
+
+### Built-in reference hashes
+
+The byte-level tests regenerate and verify these browser-library WAV files:
+
+| Reference file | SHA-256 |
+| --- | --- |
+| `reference-01-low-high-spectrum.wav` | `adeadc7e74b0b480eb1d4e8878d5de62a839ae1676e003c9283e3ee04322f219` |
+| `reference-02-a3-a4-pitch-class.wav` | `19d58fcae91507a1295c48ab1133f4b89044874918676ccdc601eefc4cc4ba2d` |
+| `reference-03-wave-shapes.wav` | `0aac34404dcc8f18cd18f59961827f71a0f074f349b752d425a9f98fc2cbbd78` |
+| `reference-04-pulses-120-bpm-equivalent.wav` | `5cb0712a452790d298ad26a4337d8b68b4a4642a958915a4d419e22b0884a35f` |
+| `reference-05-a-b-a-c-recurrence.wav` | `bad24113217959364267d999fe134e0fce6a2a16df918e4a08890e0a32b861b6` |
 
 ## Current optical and interface regression pass
 
-The fixed optical system is now part of the executable contract rather than a style-guide promise. A recursive test rejects any hexadecimal or RGB colour source outside black, electric blue and white; quieter tones must be alpha or `color-mix()` derivatives of those pigments. Shader highlight compression now operates on one scalar intensity before multiplying the preserved pigment ratio, and CSS brightness filters are prohibited. Rendered-pixel gates inspect both WebGL 2 and Canvas 2D output against the black/electric-blue/white mixture gamut; the reproducible README capture repeats the same check on a populated Recurrence Atlas before writing a lossless PNG. The landing journey also verifies the computed `#008CFF` action surface with black text.
+The fixed optical system is now part of the executable contract rather than a style-guide promise. A recursive test rejects undeclared hexadecimal, comma- or space-form RGB, HSL, HWB, Lab/LCH, display-colour and named-pigment sources across first-party source, public assets and configuration; quieter tones must be alpha or `color-mix()` derivatives of black, electric blue and white. Shader highlight compression operates on one scalar intensity before multiplying the preserved pigment ratio, fixed reference geometry is composited afterward, and CSS brightness filters are prohibited. Rendered-pixel gates inspect both WebGL 2 and Canvas 2D output against the black/electric-blue/white mixture gamut; the reproducible README capture repeats the same check on a populated Recurrence Atlas before writing a lossless PNG. The landing journey also verifies the computed `#008CFF` action surface with black text, the two branded font families and the small-text light-surface roles.
 
-The measured interface was repeated in the Codex in-app browser at 1280 × 720 and 390 × 844. The desktop grid reported an 848 px stage and 294 px inspector with no document overflow. The mobile pass reported no horizontal overflow, transport before inspector, `object-fit: contain`, a 9:16 displayed ratio of `0.5625` against an intrinsic ratio of `0.5628`, and successful arrow-key scene changes. The browser console contained no warnings or errors. These checks approve the recorded layouts and interactions; they are not a substitute for the still-open cross-browser and assistive-technology matrix.
+The measured interface was repeated in the Codex in-app browser at 1280 × 720 and 390 × 844. The two-column desktop studio filled the viewport without document overflow. The mobile pass reported no horizontal overflow, transport before inspector, `object-fit: contain`, a 9:16 displayed ratio of `0.5625` against an intrinsic ratio of `0.5628`, and successful arrow-key scene changes. The browser console contained no warnings or errors. These checks approve the recorded layouts and interactions; they are not a substitute for the still-open cross-browser and assistive-technology matrix.
 
 The landing journey keeps the browser's default renderer path. The two fixed-duration signal journeys deliberately select AV/01's production Canvas 2D fallback before navigation. That prevents a CI runner's software-WebGL throughput from shortening the evidence history while leaving the WAV fixture, `AnalyserNode`, analysis timer, feature bus and every scientific threshold unchanged.
 
 The required release commands are:
+
+```bash
+npm run release:check
+```
+
+A clean checkout must run `npm run browsers:install` once before this gate.
+
+That gate expands to the following independently runnable checks:
 
 ```bash
 npm run type-check
@@ -34,6 +67,7 @@ npm run lint -- --max-warnings=0
 npm test
 npm run science:fixtures:check
 npm run audit:ci
+npm run build
 npm run test:e2e
 ```
 
@@ -87,14 +121,14 @@ The committed regression matrix now covers production smoothing at 90, 120, 180 
 - Replaying from the end originally leaked the prior pass. That failure was fixed; the browser then changed sequence `401` to `29` and similarity history `64` to `5` after a 320 ms fresh replay.
 - Source changes began with sequence and stateful history at zero.
 - A full-track 1280 × 720 WebGL render completed through the browser's negotiated MediaRecorder path, produced a downloadable WebM, used the same scene and measured graph, and restored playback to `00:00`.
-- The committed README image is a real 1280 × 720 browser frame of Recurrence Atlas at `1.000` recurrence with the method, limitation, separate analysis/file-overview provenance and WebGL 2 state visible.
+- The committed README image is a real 1280 × 720 browser frame of Recurrence Atlas at `1.000` recurrence with its method and limitation visible. The capture script separately verifies measured provenance, a populated similarity history, the three-pigment render contract and the absence of browser runtime failures before writing the image.
 
 ## Gate register
 
 | Gate | Status on this candidate | Evidence boundary |
 | --- | --- | --- |
-| `AV01-VAL-001` deterministic numerical fixtures | **Pass** | 38/38 unit tests, including production-smoothed 90/120/180/200 BPM-equivalent cases, transient-gate adversarial controls, tone-to-silence clearing and fixed-optical-system enforcement |
-| `AV01-VAL-002` signal-family fixtures | **Pass** | Nine reproducible WAV fixtures, hash verification and 4/4 optimized Chromium end-to-end gates |
+| `AV01-VAL-001` deterministic numerical fixtures | **Pass** | 51/51 unit tests, including production-smoothed 90/120/180/200 BPM-equivalent cases, transient-gate adversarial controls, peak-preserving waveform reduction, built-in-reference synthesis and fixed-optical-system enforcement |
+| `AV01-VAL-002` signal-family fixtures | **Pass** | Nine offline fixtures plus five browser-library reference files, hash verification and two fixed-duration signal-control journeys within the five-test optimized Chromium suite |
 | `AV01-VAL-003` scene-contract routing | **Pass** | Non-overlapping feature declarations and WebGL block-isolation tests; Canvas routing exercised by optimized-browser signal gates against the same contract |
 | `AV01-VAL-004` browser integration | **Partial** | Local-file provenance, decoded rate, FFT/window disclosure, Canvas 2D and WebGL 2 passed in the recorded browser; system capture and microphone permission/settings were not exercised |
 | `AV01-VAL-005` reset/seek/source lifecycle | **Pass** | Reset unit tests plus source, stop, replay-from-end and export restoration checks |

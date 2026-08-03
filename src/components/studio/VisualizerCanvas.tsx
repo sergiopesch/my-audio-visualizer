@@ -34,6 +34,8 @@ export interface Telemetry {
   onsetStrength: number;
   centroidHz: number;
   rolloffHz: number;
+  highFrequencyCutoffHz: number;
+  rolloffPercent: number;
   highFrequencyRatio: number;
   chromaConcentration: number;
   dominantChroma: number;
@@ -56,6 +58,7 @@ export interface VisualizerCanvasProps {
   analyserRef: RefObject<AnalyserNode | null>;
   settings: VisualSettings;
   mode: "demo" | "live";
+  sourceProvenance?: "user-source" | "built-in-reference";
   active: boolean;
   sourceRevision: number;
   getPlaybackTime: () => number;
@@ -143,6 +146,7 @@ export function VisualizerCanvas({
   analyserRef,
   settings,
   mode,
+  sourceProvenance = "user-source",
   active,
   sourceRevision,
   getPlaybackTime,
@@ -369,6 +373,8 @@ export function VisualizerCanvas({
           onsetStrength: frame.onsetStrength,
           centroidHz: frame.spectralCentroidHz,
           rolloffHz: frame.spectralRolloffHz,
+          highFrequencyCutoffHz: frame.highFrequencyCutoffHz,
+          rolloffPercent: frame.spectralRolloffPercent,
           highFrequencyRatio: frame.highFrequencyRatio,
           chromaConcentration: frame.chromaConcentration,
           dominantChroma: frame.dominantChroma,
@@ -728,7 +734,9 @@ export function VisualizerCanvas({
   const stateLabel = active ? "active" : "paused";
   const contentLabel = mode === "demo"
     ? `Synthetic feature preview, not measured audio, ${stateLabel}`
-    : `Measured audio visualization, ${stateLabel}`;
+    : sourceProvenance === "built-in-reference"
+      ? `Built-in reference signal visualization, measured through the audio analysis path, ${stateLabel}`
+      : `Measured audio visualization, ${stateLabel}`;
 
   return (
     <canvas
@@ -739,6 +747,7 @@ export function VisualizerCanvas({
       style={{ aspectRatio: `${aspect.width} / ${aspect.height}` }}
       role="img"
       aria-label={contentLabel}
+      data-source-provenance={mode === "demo" ? "synthetic-preview" : sourceProvenance}
     >
       Audio visualization. Your browser does not support the canvas element.
     </canvas>

@@ -3,9 +3,9 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
-  forbidOnly: Boolean(process.env.CI),
+  forbidOnly: true,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   timeout: 30_000,
   expect: { timeout: 7_500 },
@@ -29,7 +29,7 @@ export default defineConfig({
   webServer: {
     command: "npm run start -- --hostname 127.0.0.1 --port 3100",
     url: "http://127.0.0.1:3100",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

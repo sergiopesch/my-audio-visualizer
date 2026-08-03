@@ -53,9 +53,6 @@ export interface CanvasRecorderResult {
   reset: () => void;
 }
 
-export type UseCanvasRecorderOptions = CanvasRecorderOptions;
-export type UseCanvasRecorderResult = CanvasRecorderResult;
-
 interface RecorderViewState {
   status: RecorderStatus;
   progress: number;
@@ -878,16 +875,6 @@ export function useCanvasRecorder({
     }
   }, [forceAbortSession, revokeDownloadUrl]);
 
-  const reset = useCallback(() => {
-    const session = sessionRef.current;
-    if (session) forceAbortSession(session, true);
-    revokeDownloadUrl();
-
-    if (mountedRef.current) {
-      setViewState(initialState());
-    }
-  }, [forceAbortSession, revokeDownloadUrl]);
-
   useEffect(() => {
     if (previousSourceModeRef.current === sourceMode) return;
     previousSourceModeRef.current = sourceMode;
@@ -913,8 +900,6 @@ export function useCanvasRecorder({
     start,
     stop,
     cancel,
-    reset,
+    reset: cancel,
   };
 }
-
-export default useCanvasRecorder;

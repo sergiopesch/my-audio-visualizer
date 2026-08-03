@@ -16,10 +16,16 @@ These improvements strengthen the current five scenes without changing their val
 - The full measured frame is contained on narrow screens instead of being cropped.
 - Keyboard controls keep their native behaviour, radiogroups support expected navigation, and contrast/transparency preferences have explicit treatments.
 - Canvas sizing and test telemetry no longer force layout reads and dozens of DOM mutations on every animation frame.
+- A minimal reference-gallery interface now keeps the stage primary and moves method, provenance and appearance detail behind explicit disclosures.
+- Five deterministic built-in references make the expected response of every current view audible and visible without requiring a user file.
+- The time-domain display now retains ordered block extrema, so high-frequency signals cannot cancel to a flat trace through whole-cycle block averaging.
+- The high-frequency Field overlay is positioned from the configured cutoff on the actual ERB layout rather than a fixed screen coordinate.
 
-## The next public experiment
+## The current public demonstration and next experiment
 
-The highest-value product addition is not a sixth scene. It is an **Experiment / Compare** view built from the existing deterministic controls:
+The first demonstration layer now ships: five on-demand reference signals select the relevant scene and publish what to listen for, what to watch and what stays controlled. Their headers, hashes and core signal properties are executable tests.
+
+The highest-value product addition is not a sixth scene. It is a true paired **Experiment / Compare** view built from the existing deterministic controls. It should expose both the positive signal and its matched negative control side by side, retain numerical observations and make the following comparisons directly falsifiable:
 
 | Comparison | Expected selectivity | Expected invariant |
 | --- | --- | --- |

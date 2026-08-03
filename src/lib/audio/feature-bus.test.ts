@@ -191,6 +191,18 @@ describe("AudioFeatureBus temporal measurements", () => {
       expect(invertedFrame.waveform[point]).toBeCloseTo(-waveform[point], 6);
     }
   });
+
+  it("keeps high-frequency time-domain energy visible in the reduced trace", () => {
+    const analyser = new FakeAnalyser();
+    const bus = createBus(analyser);
+    // 512 cycles per 4096-sample window is 6 kHz at 48 kHz. The former
+    // 16-sample block mean cancelled this signal to approximately zero.
+    analyser.setSine(512, 0.7);
+    const frame = bus.update(0);
+
+    expect(Math.max(...frame.waveform)).toBeGreaterThan(0.69);
+    expect(Math.min(...frame.waveform)).toBeLessThan(-0.69);
+  });
 });
 
 describe("AudioFeatureBus chroma", () => {

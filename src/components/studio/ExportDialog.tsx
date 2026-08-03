@@ -131,7 +131,7 @@ export function ExportDialog({
       <div className="export-dialog-header">
         <div>
           <span className="eyebrow">OUTPUT / REAL-TIME RENDER</span>
-          <h2 id="export-title">Export the performance</h2>
+          <h2 id="export-title">Render the performance</h2>
         </div>
         <button type="button" className="icon-button" onClick={onClose} disabled={recording} aria-label="Close export dialog">
           <Icon name="close" />
@@ -230,7 +230,7 @@ export function ExportDialog({
             <p>{formatName(mimeType)}</p>
             {recording ? (
               <div>
-                <button type="button" className="text-button danger" onClick={onCancel}>
+                <button type="button" className="text-button" onClick={onCancel}>
                   CANCEL
                 </button>
                 {!fileMode ? (

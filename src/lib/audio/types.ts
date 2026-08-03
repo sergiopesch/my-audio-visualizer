@@ -65,7 +65,11 @@ export interface FeatureFrame {
   readonly spectralCentroid: number;
   readonly spectralRolloffHz: number;
   readonly spectralRolloff: number;
-  /** Fraction of spectral power above the configured cutoff (3 kHz by default). */
+  /** Configured threshold used by highFrequencyRatio (3 kHz by default). */
+  readonly highFrequencyCutoffHz: number;
+  /** Configured cumulative-power target used by spectralRolloffHz (0.85 by default). */
+  readonly spectralRolloffPercent: number;
+  /** Fraction of spectral power above highFrequencyCutoffHz. */
   readonly highFrequencyRatio: number;
   /** Adaptive half-wave spectral-flux response in the 0..1 range. */
   readonly onsetStrength: number;
@@ -85,7 +89,7 @@ export interface FeatureFrame {
   readonly isSilent: boolean;
   readonly silenceDurationSeconds: number;
 
-  /** 256 block-averaged time-domain samples in the -1..1 range. */
+  /** 256 time-ordered min/max extrema from 128 blocks of the mono analysis window. */
   readonly waveform: Float32Array<ArrayBuffer>;
   /** Linear-amplitude FFT bins. */
   readonly spectrum: Float32Array<ArrayBuffer>;

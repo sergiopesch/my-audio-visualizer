@@ -51,12 +51,23 @@ The analysis clock is separate from the render clock. WebGL 2 is preferred and C
 
 ## Required validation
 
+Run the complete release gate with:
+
+```bash
+npm run release:check
+```
+
+On a clean checkout, run `npm run browsers:install` once before the release gate.
+
+Its independently runnable checks are:
+
 ```bash
 npm run type-check
 npm run lint -- --max-warnings=0
 npm test
 npm run science:fixtures:check
 npm run audit:ci
+npm run build
 npm run test:e2e
 ```
 

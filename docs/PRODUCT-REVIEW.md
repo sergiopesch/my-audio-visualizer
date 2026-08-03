@@ -147,7 +147,7 @@ AV/01 now uses one authored language: black for silence and the stage, electric 
 
 I do not want a citation to become decoration or borrowed authority. Each scene now has a stable claim ID, a narrow question, an explicit exclusion and a primary-source trail in [the scientific contract](SCIENCE.md#the-five-scene-contract).
 
-Those sources establish precedents for the signal representations. They do not endorse AV/01, validate the artistic mappings or approve the implementation. The [release-candidate validation record](VALIDATION.md) now publishes the fixture, browser, lifecycle and provenance evidence: the five local-file scene contracts pass internally, while live-capture integration is partial and long-session timing remains open. Perceptual study, independent peer review and metrological certification are separate things, and AV/01 does not claim any of them.
+Those sources establish precedents for the signal representations. They do not endorse AV/01, validate the artistic mappings or approve the implementation. The [release-candidate validation record](VALIDATION.md) now publishes the fixture, browser, lifecycle and provenance evidence: the five built-in-reference and recorded local-file scene contracts pass internally, while live-capture integration is partial and long-session timing remains open. Perceptual study, independent peer review and metrological certification are separate things, and AV/01 does not claim any of them.
 
 ## The standard I am setting
 
@@ -159,6 +159,7 @@ The AV/01 rebuild now includes:
 - Signal-derived scene state without an extra autonomous animation clock.
 - Media-playhead transport/export coordination, with analysis history reset across seek, source change, stop and replay-from-end.
 - Local file, microphone and shared tab/application sources.
+- Five deterministic, locally generated reference WAV files that enter through the measured file path and select the matching view.
 - A real waveform timeline and keyboard-operable transport.
 - Landscape, square and portrait output frames.
 - Browser-aware recording format negotiation.
@@ -188,7 +189,7 @@ The first AV/01 rebuild established a UI, lifecycle and export baseline. That ea
 
 The new scientific-analysis release is a separate evidence set. Its deterministic numerical fixtures, signal-family fixtures, scene-contract routing, reset/seek/source lifecycle and local-file export provenance now pass internally in the [validation register](SCIENCE.md#validation-register). Browser integration is partial because system/microphone capture was not exercised, and long-session timing remains open.
 
-I call the five local-file scene contracts internally validated only within the recorded evidence boundary. I do not call AV/01 peer reviewed, perceptually validated, metrologically certified or approved by any cited author, publisher or standards body.
+I call the five scene contracts internally validated on the built-in-reference and recorded local-file paths only within the published evidence boundary. I do not call AV/01 peer reviewed, perceptually validated, metrologically certified or approved by any cited author, publisher or standards body.
 
 ## The project history is part of the product
 

@@ -4,13 +4,13 @@ import type {
   AudioSourceDetails,
   SourceMode,
 } from "@/hooks/useAudioEngine";
+import type { ReferenceSignalDefinition } from "@/lib/audio/reference-signals";
 import { PITCH_CLASS_NAMES } from "@/lib/audio/scientific-analysis";
 import {
   ASPECTS,
   findScene,
   type VisualSettings,
 } from "@/lib/visualizer/types";
-import { Icon } from "./Icons";
 import type { Telemetry } from "./VisualizerCanvas";
 
 interface InspectorPanelProps {
@@ -19,6 +19,7 @@ interface InspectorPanelProps {
   sourceMode: SourceMode;
   captureSettings: AudioCaptureSettings | null;
   sourceDetails: AudioSourceDetails | null;
+  referenceSignal: ReferenceSignalDefinition | null;
   onChange: (patch: Partial<VisualSettings>) => void;
   onReset: () => void;
 }
@@ -105,8 +106,8 @@ function sceneReadouts(
   if (sceneId === "field") {
     return [
       ["Centroid", `${Math.round(telemetry.centroidHz)} Hz`],
-      ["85% rolloff", `${Math.round(telemetry.rolloffHz)} Hz`],
-      [">3 kHz power", percentage(telemetry.highFrequencyRatio)],
+      [`${Math.round(telemetry.rolloffPercent * 100)}% rolloff`, `${Math.round(telemetry.rolloffHz)} Hz`],
+      [`>${Math.round(telemetry.highFrequencyCutoffHz / 1_000)} kHz power`, percentage(telemetry.highFrequencyRatio)],
     ];
   }
   if (sceneId === "orbit") {
@@ -117,37 +118,32 @@ function sceneReadouts(
           ? PITCH_CLASS_NAMES[telemetry.dominantChroma] ?? "—"
           : "—",
       ],
-      ["Concentration index", indexValue(telemetry.chromaConcentration)],
-      ["Scale", "Unitless · not probability"],
+      ["Concentration", indexValue(telemetry.chromaConcentration)],
     ];
   }
   if (sceneId === "trace") {
     return [
       ["RMS level", `${telemetry.levelDbFs.toFixed(1)} dBFS`],
       ["Crest factor", `${telemetry.crestFactor.toFixed(2)}×`],
-      ["Zero-crossing fraction", percentage(telemetry.zeroCrossingRate)],
+      ["Zero crossings", percentage(telemetry.zeroCrossingRate)],
     ];
   }
   if (sceneId === "lattice") {
     return [
       ["Onset index", indexValue(telemetry.onsetStrength)],
-      ["Transient candidates", String(telemetry.transientCandidateCount)],
       [
         "Period candidate",
         telemetry.periodicityBpm > 0
           ? `${telemetry.periodicityBpm.toFixed(1)} BPM-eq.`
-          : "Gathering evidence",
+          : "Gathering…",
       ],
-      [
-        "Heuristic index / history",
-        `${indexValue(telemetry.periodicityEvidence)} / ${telemetry.rhythmEvidenceSeconds.toFixed(1)} s`,
-      ],
+      ["Evidence / events", `${indexValue(telemetry.periodicityEvidence)} / ${telemetry.transientCandidateCount}`],
     ];
   }
   return [
-    ["Cosine similarity >2 s", indexValue(telemetry.recurrence)],
-    ["History compared", `${(telemetry.similarityCount / 8).toFixed(1)} s`],
-    ["Matrix samples", `${telemetry.similarityCount} / 64`],
+    ["Recurrence", indexValue(telemetry.recurrence)],
+    ["History", `${(telemetry.similarityCount / 8).toFixed(1)} s`],
+    ["Matrix", `${telemetry.similarityCount} / 64`],
   ];
 }
 
@@ -162,6 +158,7 @@ export function InspectorPanel({
   sourceMode,
   captureSettings,
   sourceDetails,
+  referenceSignal,
   onChange,
   onReset,
 }: InspectorPanelProps) {
@@ -170,79 +167,76 @@ export function InspectorPanel({
   const windowMilliseconds = telemetry.sampleRate > 0
     ? (telemetry.fftSize / telemetry.sampleRate) * 1_000
     : 0;
+
   return (
-    <aside className="inspector-panel" aria-label="Visual controls">
+    <aside className="inspector-panel" aria-label="View details and controls">
       <div className="inspector-title">
-        <span>
-          <Icon name="sliders" size={16} />
-          SHAPE SIGNAL
-        </span>
+        <span>VIEW {String(scene.index + 1).padStart(2, "0")} / 05</span>
         <button type="button" onClick={onReset} className="text-button">
           RESET
         </button>
       </div>
 
       <section className="inspector-scene-note" aria-live="polite">
-        <span className="eyebrow">ACTIVE SCENE</span>
+        <p className="eyebrow">{scene.claimId}</p>
         <h2>{scene.name}</h2>
         <p>{scene.description}</p>
-        <small>{scene.mapping}</small>
+        <div className="scene-question">
+          <span>ASKS</span>
+          <strong>{scene.question}</strong>
+        </div>
       </section>
 
-      <section className="inspector-section science-panel" aria-labelledby="science-title">
-        <h3 id="science-title">HOW THIS SCENE LISTENS · AV01-SCI-00{scene.index + 1}</h3>
-        <p className="science-representation">{scene.representation}</p>
-        <p className="science-question">{scene.question}</p>
-        <dl className="science-readouts">
-          {readouts.map(([label, value]) => (
-            <div key={label}>
-              <dt>{label}</dt>
-              <dd>{value}</dd>
+      <dl className="science-readouts" aria-label="Live measurements">
+        {readouts.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {referenceSignal ? (
+        <section className="reference-experiment" aria-labelledby="reference-experiment-title">
+          <p className="eyebrow">BUILT-IN REFERENCE</p>
+          <h3 id="reference-experiment-title">{referenceSignal.name}</h3>
+          <p>{referenceSignal.signal}</p>
+          <dl>
+            <div>
+              <dt>LISTEN</dt>
+              <dd>{referenceSignal.listenFor}</dd>
             </div>
-          ))}
-        </dl>
+            <div>
+              <dt>WATCH</dt>
+              <dd>{referenceSignal.watchFor}</dd>
+            </div>
+            <div>
+              <dt>CONTROL</dt>
+              <dd>{referenceSignal.controlledVariable}</dd>
+            </div>
+          </dl>
+        </section>
+      ) : null}
+
+      <section className="evidence-boundary" aria-labelledby="evidence-title">
+        <h3 id="evidence-title">EVIDENCE BOUNDARY</h3>
+        <p className="science-representation">{scene.representation}</p>
         <p className="science-limitation">
-          <strong>Does not infer:</strong> {scene.limitation}
+          <strong>Does not infer</strong>
+          {scene.limitation}
         </p>
-        <small className="science-method">
-          {telemetry.fftSize || 4_096}-sample {scene.id === "trace"
-            ? "unwindowed time-domain readout"
-            : "browser Blackman spectrum"}
-          {windowMilliseconds > 0 ? ` · ${windowMilliseconds.toFixed(1)} ms` : ""}
-          {` · nominal ${telemetry.analysisRateHz} Hz · mono analysis graph ${telemetry.sampleRate} Hz`}
-        </small>
-        {sourceMode === "file" && sourceDetails ? (
-          <small className="science-method">
-            Decoded file overview: {sourceDetails.sampleRate} Hz · {sourceDetails.channelCount ?? "?"} ch
-            {(sourceDetails.channelCount ?? 0) > 1 ? " · playback analyser downmixes to mono" : ""}
-            {" · browser decode may resample"}
-          </small>
-        ) : null}
-        {sourceMode !== "file" && sourceMode !== "none" && captureSettings ? (
-          <small className="science-method">
-            {sourceMode === "microphone" ? "Reported microphone" : "Reported capture"}: {captureSettings.sampleRate ?? "?"} Hz · {captureSettings.channelCount ?? "?"} ch
-            {` · echo cancellation ${settingState(captureSettings.echoCancellation)}`}
-            {` · noise suppression ${settingState(captureSettings.noiseSuppression)}`}
-            {` · auto gain ${settingState(captureSettings.autoGainControl)}`}
-          </small>
-        ) : null}
-        {sourceMode !== "file" && sourceMode !== "none" && !captureSettings && sourceDetails ? (
-          <small className="science-method">
-            Analysis graph fallback: {sourceDetails.sampleRate} Hz · ? ch · capture track did not report channel settings
-          </small>
-        ) : null}
         <a
           className="science-link"
           href="https://github.com/sergiopesch/my-audio-visualizer/blob/main/docs/SCIENCE.md"
           target="_blank"
           rel="noreferrer"
         >
-          METHOD, SOURCES &amp; LIMITS ↗
+          METHOD &amp; PRIMARY SOURCES ↗
         </a>
       </section>
 
-      <section className="inspector-section" aria-labelledby="response-title">
-        <h3 id="response-title">RESPONSE</h3>
+      <details className="inspector-details">
+        <summary>Appearance <span>04 controls</span></summary>
         <div className="parameter-stack">
           <ParameterSlider
             id="sensitivity-control"
@@ -276,31 +270,17 @@ export function InspectorPanel({
             onChange={(detail) => onChange({ detail })}
           />
         </div>
-      </section>
+      </details>
 
-      <section className="inspector-section optical-key-panel" aria-labelledby="optical-key-title">
-        <h3 id="optical-key-title">OPTICAL KEY</h3>
-        <dl className="optical-key-list">
-          <div>
-            <dt><i className="optical-chip optical-chip-signal" aria-hidden="true" />Electric blue</dt>
-            <dd>Signal-derived evidence</dd>
-          </div>
-          <div>
-            <dt><i className="optical-chip optical-chip-reference" aria-hidden="true" />White</dt>
-            <dd>References and annotation</dd>
-          </div>
-        </dl>
-        <p>Extent, opacity and line form carry value. Hue never adds an undeclared audio dimension.</p>
-      </section>
-
-      <section className="inspector-section" aria-labelledby="frame-title">
-        <h3 id="frame-title">FRAME</h3>
+      <details className="inspector-details">
+        <summary>Frame &amp; comfort <span>{settings.aspect}</span></summary>
         <div className="aspect-grid" role="radiogroup" aria-label="Canvas aspect ratio">
           {ASPECTS.map((aspect, index) => (
             <button
               key={aspect.id}
               type="button"
               role="radio"
+              aria-label={aspect.ratio}
               aria-checked={settings.aspect === aspect.id}
               tabIndex={settings.aspect === aspect.id ? 0 : -1}
               className={settings.aspect === aspect.id ? "is-active" : ""}
@@ -317,26 +297,58 @@ export function InspectorPanel({
             </button>
           ))}
         </div>
-      </section>
-
-      <section className="safety-row">
-        <div>
-          <strong>Visual comfort</strong>
-          <small>Reduces glow and highlight contrast</small>
+        <div className="safety-row">
+          <div>
+            <strong>Visual comfort</strong>
+            <small>Reduce glow and highlight contrast</small>
+          </div>
+          <button
+            type="button"
+            className={`switch-control${settings.highlightCompression ? " is-on" : ""}`}
+            role="switch"
+            aria-checked={settings.highlightCompression}
+            aria-label="Visual comfort mode"
+            onClick={() => onChange({
+              highlightCompression: !settings.highlightCompression,
+            })}
+          >
+            <span />
+          </button>
         </div>
-        <button
-          type="button"
-          className={`switch-control${settings.highlightCompression ? " is-on" : ""}`}
-          role="switch"
-          aria-checked={settings.highlightCompression}
-          aria-label="Visual comfort mode"
-          onClick={() => onChange({
-            highlightCompression: !settings.highlightCompression,
-          })}
-        >
-          <span />
-        </button>
-      </section>
+      </details>
+
+      <details className="inspector-details">
+        <summary>Signal provenance <span>{telemetry.sampleRate || "—"} Hz</span></summary>
+        <div className="provenance-copy">
+          <p>
+            {telemetry.fftSize || 4_096}-sample {scene.id === "trace"
+              ? "peak-preserving time-domain reduction"
+              : "browser Blackman spectrum"}
+            {windowMilliseconds > 0 ? ` · ${windowMilliseconds.toFixed(1)} ms` : ""}
+            {` · nominal ${telemetry.analysisRateHz} Hz · mono graph`}
+          </p>
+          {sourceMode === "file" && sourceDetails ? (
+            <p>
+              Decoded overview: {sourceDetails.sampleRate} Hz · {sourceDetails.channelCount ?? "?"} ch
+              {(sourceDetails.channelCount ?? 0) > 1 ? " · analyser downmixes to mono" : ""}
+              {" · browser decode may resample"}
+            </p>
+          ) : null}
+          {sourceMode !== "file" && sourceMode !== "none" && captureSettings ? (
+            <p>
+              Reported capture: {captureSettings.sampleRate ?? "?"} Hz · {captureSettings.channelCount ?? "?"} ch
+              {` · echo cancellation ${settingState(captureSettings.echoCancellation)}`}
+              {` · noise suppression ${settingState(captureSettings.noiseSuppression)}`}
+              {` · auto gain ${settingState(captureSettings.autoGainControl)}`}
+            </p>
+          ) : null}
+          {sourceMode !== "file" && sourceMode !== "none" && !captureSettings && sourceDetails ? (
+            <p>
+              Analysis graph fallback: {sourceDetails.sampleRate} Hz · channel count not reported.
+            </p>
+          ) : null}
+        </div>
+      </details>
     </aside>
   );
 }

@@ -1,6 +1,11 @@
 import type { FeatureFrame } from "@/lib/audio";
 import { FULLSCREEN_VERTEX_SHADER, SPECTRAL_FRAGMENT_SHADER } from "./shaders";
-import { findOpticalSystem, findScene, type VisualSettings } from "./types";
+import {
+  REFERENCE_GEOMETRY_INTENSITY,
+  findOpticalSystem,
+  findScene,
+  type VisualSettings,
+} from "./types";
 
 export type RendererKind = "webgl2" | "canvas2d";
 
@@ -28,9 +33,8 @@ type UniformLocations = {
   gain: WebGLUniformLocation;
   highlightCompression: WebGLUniformLocation;
   background: WebGLUniformLocation;
-  primary: WebGLUniformLocation;
-  secondary: WebGLUniformLocation;
-  accent: WebGLUniformLocation;
+  signal: WebGLUniformLocation;
+  reference: WebGLUniformLocation;
 };
 
 const BAND_COUNT = 24;
@@ -212,9 +216,8 @@ class WebGLSpectralRenderer implements SpectralRenderer {
       gain: requiredUniform(gl, this.program, "uGain"),
       highlightCompression: requiredUniform(gl, this.program, "uHighlightCompression"),
       background: requiredUniform(gl, this.program, "uBackground"),
-      primary: requiredUniform(gl, this.program, "uPrimary"),
-      secondary: requiredUniform(gl, this.program, "uSecondary"),
-      accent: requiredUniform(gl, this.program, "uAccent"),
+      signal: requiredUniform(gl, this.program, "uSignal"),
+      reference: requiredUniform(gl, this.program, "uReference"),
     };
 
     const texture = gl.createTexture();
@@ -258,6 +261,10 @@ class WebGLSpectralRenderer implements SpectralRenderer {
     const scene = findScene(settings.scene);
     const centroidPosition = frequencyBandPosition(frame, frame.spectralCentroidHz);
     const rolloffPosition = frequencyBandPosition(frame, frame.spectralRolloffHz);
+    const highFrequencyCutoffPosition = frequencyBandPosition(
+      frame,
+      frame.highFrequencyCutoffHz,
+    );
     const similarityCount = Math.min(SIMILARITY_SIZE, Math.max(0, frame.selfSimilarityCount));
     const similarityHead = frame.selfSimilarityHead >= 0
       ? (frame.selfSimilarityHead + 0.5) / SIMILARITY_SIZE
@@ -310,7 +317,7 @@ class WebGLSpectralRenderer implements SpectralRenderer {
       centroidPosition,
       rolloffPosition,
       frame.highFrequencyRatio,
-      0,
+      highFrequencyCutoffPosition,
     );
     gl.uniform4f(
       this.uniforms.rhythm,
@@ -343,9 +350,8 @@ class WebGLSpectralRenderer implements SpectralRenderer {
       settings.highlightCompression ? 1 : 0,
     );
     gl.uniform3f(this.uniforms.background, ...opticalSystem.background);
-    gl.uniform3f(this.uniforms.primary, ...opticalSystem.primary);
-    gl.uniform3f(this.uniforms.secondary, ...opticalSystem.secondary);
-    gl.uniform3f(this.uniforms.accent, ...opticalSystem.accent);
+    gl.uniform3f(this.uniforms.signal, ...opticalSystem.signal);
+    gl.uniform3f(this.uniforms.reference, ...opticalSystem.reference);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
@@ -446,7 +452,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
       const amplitude = Math.sqrt(clampUnit(frame.bands[index] * gain));
       energy += amplitude;
       const barHeight = amplitude * plotHeight;
-      context.fillStyle = cssColor(opticalSystem.primary, 0.2 + amplitude * 0.46);
+      context.fillStyle = cssColor(opticalSystem.signal, 0.2 + amplitude * 0.46);
       context.fillRect(
         index * cellWidth + 1,
         baseline - barHeight,
@@ -455,16 +461,20 @@ class CanvasSpectralRenderer implements SpectralRenderer {
       );
     }
 
+    context.save();
+    context.globalAlpha = 1;
+    context.shadowBlur = 0;
     context.lineWidth = Math.max(1, width / 1200);
-    context.strokeStyle = cssColor(opticalSystem.secondary, 0.22);
+    context.strokeStyle = cssColor(opticalSystem.reference, REFERENCE_GEOMETRY_INTENSITY);
     context.beginPath();
     context.moveTo(0, baseline);
     context.lineTo(width, baseline);
     context.stroke();
+    context.restore();
 
     if (energy <= 1e-5) return;
-    context.shadowColor = cssColor(opticalSystem.primary);
-    context.strokeStyle = cssColor(opticalSystem.primary, 0.86);
+    context.shadowColor = cssColor(opticalSystem.signal);
+    context.strokeStyle = cssColor(opticalSystem.signal, 0.86);
     context.lineWidth = Math.max(1.5, width / 900);
     context.beginPath();
     for (let index = 0; index < count; index += 1) {
@@ -479,13 +489,13 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     const centroidX = frequencyBandPosition(frame, frame.spectralCentroidHz) * width;
     const rolloffX = frequencyBandPosition(frame, frame.spectralRolloffHz) * width;
     context.lineWidth = Math.max(1.5, width / 750);
-    context.strokeStyle = cssColor(opticalSystem.primary, 0.7);
+    context.strokeStyle = cssColor(opticalSystem.signal, 0.7);
     context.beginPath();
     context.moveTo(centroidX, height * 0.06);
     context.lineTo(centroidX, baseline);
     context.stroke();
     context.lineWidth = Math.max(1, width / 1200);
-    context.strokeStyle = cssColor(opticalSystem.primary, 0.64);
+    context.strokeStyle = cssColor(opticalSystem.signal, 0.64);
     context.setLineDash([Math.max(3, width / 240), Math.max(4, width / 180)]);
     context.beginPath();
     context.moveTo(rolloffX, height * 0.06);
@@ -493,8 +503,9 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     context.stroke();
     context.setLineDash([]);
 
-    context.fillStyle = cssColor(opticalSystem.primary, frame.highFrequencyRatio * 0.12);
-    context.fillRect(width * 0.62, height * 0.06, width * 0.38, baseline - height * 0.06);
+    const highFrequencyX = frequencyBandPosition(frame, frame.highFrequencyCutoffHz) * width;
+    context.fillStyle = cssColor(opticalSystem.signal, frame.highFrequencyRatio * 0.12);
+    context.fillRect(highFrequencyX, height * 0.06, width - highFrequencyX, baseline - height * 0.06);
   }
 
   private drawOrbit(
@@ -510,13 +521,17 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     const scale = Math.min(width, height);
     const innerRadius = scale * 0.07;
     const gain = visualGain(settings);
-    context.shadowColor = cssColor(opticalSystem.primary);
+    context.shadowColor = cssColor(opticalSystem.signal);
 
+    context.save();
+    context.globalAlpha = 1;
+    context.shadowBlur = 0;
     context.beginPath();
     context.arc(centerX, centerY, innerRadius * 0.76, 0, TAU);
-    context.strokeStyle = cssColor(opticalSystem.secondary, 0.2);
+    context.strokeStyle = cssColor(opticalSystem.reference, REFERENCE_GEOMETRY_INTENSITY);
     context.lineWidth = Math.max(1, width / 1200);
     context.stroke();
+    context.restore();
 
     for (let pitchClass = 0; pitchClass < CHROMA_COUNT; pitchClass += 1) {
       const energy = Math.sqrt(clampUnit((frame.chroma[pitchClass] ?? 0) * gain));
@@ -528,11 +543,11 @@ class CanvasSpectralRenderer implements SpectralRenderer {
       context.arc(centerX, centerY, innerRadius, start, end);
       context.arc(centerX, centerY, radius, end, start, true);
       context.closePath();
-      context.fillStyle = cssColor(opticalSystem.primary, 0.22 + energy * 0.5);
+      context.fillStyle = cssColor(opticalSystem.signal, 0.22 + energy * 0.5);
       context.fill();
       context.strokeStyle = pitchClass === frame.dominantChroma
-        ? cssColor(opticalSystem.primary, frame.chromaConcentration)
-        : cssColor(opticalSystem.primary, 0.44);
+        ? cssColor(opticalSystem.signal, frame.chromaConcentration)
+        : cssColor(opticalSystem.signal, 0.44);
       context.lineWidth = pitchClass === frame.dominantChroma
         ? Math.max(2, width / 500)
         : Math.max(1, width / 1000);
@@ -542,7 +557,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     if (frame.chromaConcentration > 0) {
       context.beginPath();
       context.arc(centerX, centerY, innerRadius * 0.76, 0, TAU);
-      context.strokeStyle = cssColor(opticalSystem.primary, 0.35 + frame.chromaConcentration * 0.5);
+      context.strokeStyle = cssColor(opticalSystem.signal, 0.35 + frame.chromaConcentration * 0.5);
       context.lineWidth = Math.max(1, frame.chromaConcentration * scale * 0.012);
       context.stroke();
     }
@@ -562,16 +577,20 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     const rms = clampUnit(frame.rms * gain) * amplitudeScale;
     const peak = clampUnit(frame.peak * gain) * amplitudeScale;
 
+    context.save();
+    context.globalAlpha = 1;
+    context.shadowBlur = 0;
     context.lineWidth = Math.max(1, width / 1200);
-    context.strokeStyle = cssColor(opticalSystem.secondary, 0.2);
+    context.strokeStyle = cssColor(opticalSystem.reference, REFERENCE_GEOMETRY_INTENSITY);
     context.beginPath();
     context.moveTo(0, center);
     context.lineTo(width, center);
     context.stroke();
+    context.restore();
 
     context.setLineDash([Math.max(3, width / 220), Math.max(4, width / 150)]);
     context.lineWidth = Math.max(1, width / 1200);
-    context.strokeStyle = cssColor(opticalSystem.primary, 0.38);
+    context.strokeStyle = cssColor(opticalSystem.signal, 0.38);
     for (const offset of [-rms, rms]) {
       context.beginPath();
       context.moveTo(0, center + offset);
@@ -579,7 +598,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
       context.stroke();
     }
     context.setLineDash([]);
-    context.strokeStyle = cssColor(opticalSystem.primary, 0.3);
+    context.strokeStyle = cssColor(opticalSystem.signal, 0.3);
     for (const offset of [-peak, peak]) {
       context.beginPath();
       context.moveTo(0, center + offset);
@@ -589,8 +608,8 @@ class CanvasSpectralRenderer implements SpectralRenderer {
 
     const waveform = frame.waveform;
     if (waveform.length > 0) {
-      context.shadowColor = cssColor(opticalSystem.primary);
-      context.strokeStyle = cssColor(opticalSystem.primary, 0.92);
+      context.shadowColor = cssColor(opticalSystem.signal);
+      context.strokeStyle = cssColor(opticalSystem.signal, 0.92);
       context.lineWidth = Math.max(1.5, width / 700);
       context.beginPath();
       const last = Math.max(1, waveform.length - 1);
@@ -604,9 +623,9 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     }
 
     const crest = clampUnit((frame.crestFactor - 1) / 5);
-    context.fillStyle = cssColor(opticalSystem.primary, 0.44);
+    context.fillStyle = cssColor(opticalSystem.signal, 0.44);
     context.fillRect(0, height * (1 - crest), Math.max(4, width * 0.025), height * crest);
-    context.fillStyle = cssColor(opticalSystem.primary, 0.58);
+    context.fillStyle = cssColor(opticalSystem.signal, 0.58);
     context.fillRect(0, height - Math.max(3, height * 0.018), width * frame.zeroCrossingRate, height);
   }
 
@@ -630,13 +649,17 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     const centerX = width / 2;
     const centerY = height / 2;
     const phaseRadius = Math.min(width, height) * (0.06 + phase * 0.52);
-    context.shadowColor = cssColor(opticalSystem.primary);
+    context.shadowColor = cssColor(opticalSystem.signal);
 
+    context.save();
+    context.globalAlpha = 1;
+    context.shadowBlur = 0;
     context.beginPath();
     context.arc(centerX, centerY, Math.min(width, height) * 0.59, 0, TAU);
-    context.strokeStyle = cssColor(opticalSystem.secondary, 0.2);
+    context.strokeStyle = cssColor(opticalSystem.reference, REFERENCE_GEOMETRY_INTENSITY);
     context.lineWidth = Math.max(1, Math.min(width, height) * 0.003);
     context.stroke();
+    context.restore();
 
     if (evidenceStrength > 0) {
       for (let row = 0; row < rows; row += 1) {
@@ -647,7 +670,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
           const ringDistance = Math.abs(distance - phaseRadius);
           const activation = clampUnit(1 - ringDistance / (cellSize * 2.4)) * evidenceStrength;
           if (activation <= 0.02) continue;
-          context.fillStyle = cssColor(opticalSystem.primary, 0.12 + activation * 0.58);
+          context.fillStyle = cssColor(opticalSystem.signal, 0.12 + activation * 0.58);
           context.fillRect(
             column * cellSize + 1,
             row * cellSize + 1,
@@ -661,7 +684,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
     if (onset > 0) {
       context.beginPath();
       context.arc(centerX, centerY, Math.min(width, height) * (0.025 + onset * 0.12), 0, TAU);
-      context.fillStyle = cssColor(opticalSystem.primary, 0.42 + onset * 0.42);
+      context.fillStyle = cssColor(opticalSystem.signal, 0.42 + onset * 0.42);
       context.fill();
     }
 
@@ -674,7 +697,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
         -PI / 2,
         -PI / 2 + TAU * evidence,
       );
-      context.strokeStyle = cssColor(opticalSystem.primary, 0.68);
+      context.strokeStyle = cssColor(opticalSystem.signal, 0.68);
       context.lineWidth = Math.max(2, Math.min(width, height) * 0.008);
       context.stroke();
     }
@@ -701,7 +724,7 @@ class CanvasSpectralRenderer implements SpectralRenderer {
         if (similarity <= 0) continue;
         const contour = 1 - Math.abs((similarity * levels) % 1 - 0.5) * 2;
         context.fillStyle = cssColor(
-          opticalSystem.primary,
+          opticalSystem.signal,
           0.12 + similarity * 0.6 + contour * 0.12,
         );
         context.fillRect(
@@ -713,13 +736,17 @@ class CanvasSpectralRenderer implements SpectralRenderer {
       }
     }
 
-    context.strokeStyle = cssColor(opticalSystem.secondary, 0.45);
+    context.save();
+    context.globalAlpha = 1;
+    context.shadowBlur = 0;
+    context.strokeStyle = cssColor(opticalSystem.reference, REFERENCE_GEOMETRY_INTENSITY);
     context.lineWidth = Math.max(1, width / 1100);
     context.beginPath();
     context.moveTo(0, 0);
     context.lineTo(count * cellWidth, count * cellHeight);
     context.stroke();
-    context.strokeStyle = cssColor(opticalSystem.primary, frame.recurrence * 0.52);
+    context.restore();
+    context.strokeStyle = cssColor(opticalSystem.signal, 0.34);
     context.strokeRect(0, 0, count * cellWidth, count * cellHeight);
   }
 

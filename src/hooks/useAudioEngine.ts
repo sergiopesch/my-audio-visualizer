@@ -1463,5 +1463,3 @@ export function useAudioEngine(): UseAudioEngineResult {
     getCaptureStream,
   };
 }
-
-export default useAudioEngine;

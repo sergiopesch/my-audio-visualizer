@@ -8,11 +8,9 @@ interface TransportBarProps {
   currentTime: number;
   duration: number;
   peaks: number[];
-  accent: string;
   onPlayPause: () => void;
   onStop: () => void;
   onSeek: (time: number) => void;
-  onChangeSource: () => void;
 }
 
 function formatClock(seconds: number): string {
@@ -28,11 +26,9 @@ export function TransportBar({
   currentTime,
   duration,
   peaks,
-  accent,
   onPlayPause,
   onStop,
   onSeek,
-  onChangeSource,
 }: TransportBarProps) {
   const fileMode = sourceMode === "file";
   return (
@@ -61,7 +57,6 @@ export function TransportBar({
           currentTime={currentTime}
           duration={duration}
           onSeek={onSeek}
-          accent={accent}
         />
       ) : (
         <div className="live-timeline" aria-label="Live input is active">
@@ -73,14 +68,6 @@ export function TransportBar({
           <i />
         </div>
       )}
-
-      <div className="transport-tail">
-        <button type="button" className="change-source-button" onClick={onChangeSource}>
-          <Icon name="arrow-left" size={16} />
-          SOURCE
-        </button>
-        <span className="shortcut-hint">SPACE · PLAY / PAUSE</span>
-      </div>
     </footer>
   );
 }

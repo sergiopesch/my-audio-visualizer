@@ -1,3 +1,5 @@
+import { REFERENCE_GEOMETRY_INTENSITY } from "./types";
+
 export const FULLSCREEN_VERTEX_SHADER = `#version 300 es
 precision highp float;
 
@@ -38,9 +40,8 @@ uniform vec4 uSettings;
 uniform float uGain;
 uniform float uHighlightCompression;
 uniform vec3 uBackground;
-uniform vec3 uPrimary;
-uniform vec3 uSecondary;
-uniform vec3 uAccent;
+uniform vec3 uSignal;
+uniform vec3 uReference;
 
 #define PI 3.14159265359
 #define TAU 6.28318530718
@@ -82,13 +83,34 @@ vec2 stagePoint() {
   return point;
 }
 
+float fixedReferenceGeometry(vec2 point) {
+  if (uScene == 0) {
+    return lineAt(vUv.y, 0.02, 0.0018);
+  }
+  if (uScene == 1) {
+    return lineAt(length(point), 0.055, 0.0022);
+  }
+  if (uScene == 2) {
+    return lineAt(vUv.y, 0.5, 0.0018);
+  }
+  if (uScene == 3) {
+    return lineAt(length(point), 0.59, 0.003);
+  }
+
+  vec2 matrixPosition = vec2(vUv.x, 1.0 - vUv.y);
+  float countFraction = saturate(uSimilarityMeta.x);
+  float populated = step(matrixPosition.x, countFraction)
+    * step(matrixPosition.y, countFraction);
+  return lineAt(matrixPosition.y, matrixPosition.x, 0.003) * populated;
+}
+
 // scene:field:start
 vec3 renderField() {
   float total = 0.0;
   for (int index = 0; index < 24; index++) {
     total += saturate(uBands[index] * uGain);
   }
-  float evidence = saturate(total * 0.18);
+  float evidence = sqrt(saturate(total * 1.8));
   float band = sqrt(saturate(sampleBand(vUv.x) * uGain));
   float height = band * 0.82;
   float localY = saturate(vUv.y / 0.88);
@@ -98,15 +120,13 @@ vec3 renderField() {
 
   float centroidMarker = lineAt(vUv.x, uSpectral.x, 0.0032) * evidence;
   float rolloff = lineAt(vUv.x, uSpectral.y, 0.0016) * evidence;
-  float highRegion = smoothstep(0.62, 1.0, vUv.x) * uSpectral.z * fill;
-  float referenceAxis = lineAt(vUv.y, 0.02, 0.0015);
+  float highRegion = smoothstep(uSpectral.w, 1.0, vUv.x) * uSpectral.z * fill;
 
-  vec3 color = uPrimary * fill * separator * (0.34 + band * 0.9);
-  color += uPrimary * curve * 0.86;
-  color += uPrimary * centroidMarker * 0.72;
-  color += uPrimary * rolloff * 0.64;
-  color += uPrimary * highRegion * 0.28;
-  color += uAccent * referenceAxis * 0.22;
+  vec3 color = uSignal * fill * separator * (0.34 + band * 0.9);
+  color += uSignal * curve * 0.86;
+  color += uSignal * centroidMarker * 0.72;
+  color += uSignal * rolloff * 0.64;
+  color += uSignal * highRegion * 0.28;
   return color;
 }
 // scene:field:end
@@ -131,13 +151,11 @@ vec3 renderOrbit(vec2 point) {
   float dominant = 1.0 - step(0.5, abs(sector - dominantClass));
   dominant *= step(0.02, concentration) * outline;
   float concentrationRing = lineAt(radius, 0.055, 0.004) * concentration;
-  float referenceRing = lineAt(radius, 0.055, 0.0014);
 
-  vec3 color = uPrimary * body * (0.24 + chroma * 0.95);
-  color += uPrimary * outline * 0.7;
-  color += uPrimary * dominant * (0.28 + concentration * 0.52);
-  color += uPrimary * concentrationRing * 0.72;
-  color += uSecondary * referenceRing * 0.2;
+  vec3 color = uSignal * body * (0.24 + chroma * 0.95);
+  color += uSignal * outline * 0.7;
+  color += uSignal * dominant * (0.28 + concentration * 0.52);
+  color += uSignal * concentrationRing * 0.72;
   return color;
 }
 // scene:orbit:end
@@ -159,14 +177,12 @@ vec3 renderTrace() {
   float metricRegion = smoothstep(0.035, 0.025, vUv.x);
   float crestGauge = metricRegion * step(vUv.y, crest);
   float crossingGauge = step(vUv.y, 0.018) * step(vUv.x, zeroCrossings);
-  float zeroAxis = lineAt(vUv.y, 0.5, 0.0012);
 
-  vec3 color = uPrimary * trace * (0.66 + zeroCrossings * 0.22);
-  color += uPrimary * (rmsUpper + rmsLower) * 0.42;
-  color += uPrimary * (peakUpper + peakLower) * 0.3;
-  color += uPrimary * crestGauge * 0.42;
-  color += uPrimary * crossingGauge * 0.58;
-  color += uSecondary * zeroAxis * 0.2;
+  vec3 color = uSignal * trace * (0.66 + zeroCrossings * 0.22);
+  color += uSignal * (rmsUpper + rmsLower) * 0.42;
+  color += uSignal * (peakUpper + peakLower) * 0.3;
+  color += uSignal * crestGauge * 0.42;
+  color += uSignal * crossingGauge * 0.58;
   return color;
 }
 // scene:trace:end
@@ -195,13 +211,11 @@ vec3 renderLattice(vec2 point) {
   float evidenceGrid = cell
     * evidenceStrength
     * smoothstep(0.62, 0.08, abs(radius - phaseRadius));
-  float referenceRing = lineAt(radius, 0.59, 0.003);
 
-  vec3 color = uPrimary * evidenceGrid * 0.16;
-  color += uPrimary * phaseRing * (0.32 + evidenceStrength * 0.72);
-  color += uPrimary * core * (0.55 + onset * 0.8);
-  color += uPrimary * evidenceArc * 0.68;
-  color += uSecondary * referenceRing * 0.2;
+  vec3 color = uSignal * evidenceGrid * 0.16;
+  color += uSignal * phaseRing * (0.32 + evidenceStrength * 0.72);
+  color += uSignal * core * (0.55 + onset * 0.8);
+  color += uSignal * evidenceArc * 0.68;
   return color;
 }
 // scene:lattice:end
@@ -217,35 +231,35 @@ vec3 renderContour() {
   float levels = mix(6.0, 18.0, uSettings.w);
   float contourDistance = abs(fract(similarity * levels) - 0.5);
   float contour = (1.0 - smoothstep(0.37, 0.49, contourDistance)) * populated;
-  float diagonal = lineAt(matrixPosition.y, matrixPosition.x, 0.0025) * populated;
   float frontier = (
     lineAt(matrixPosition.x, countFraction, 0.0025)
     + lineAt(matrixPosition.y, countFraction, 0.0025)
   ) * step(0.01, countFraction);
 
-  vec3 color = uPrimary * similarity * (0.25 + contour * 0.78);
-  color += uPrimary * contour * similarity * 0.28;
-  color += uSecondary * diagonal * 0.42;
-  color += uPrimary * frontier * recurrence * 0.52;
+  vec3 color = uSignal * similarity * (0.25 + contour * 0.78);
+  color += uSignal * contour * similarity * 0.28;
+  color += uSignal * frontier * 0.34;
   return color;
 }
 // scene:contour:end
 
 void main() {
+  vec2 point = stagePoint();
   vec3 evidence;
   if (uScene == 1) {
-    evidence = renderOrbit(stagePoint());
+    evidence = renderOrbit(point);
   } else if (uScene == 2) {
     evidence = renderTrace();
   } else if (uScene == 3) {
-    evidence = renderLattice(stagePoint());
+    evidence = renderLattice(point);
   } else if (uScene == 4) {
     evidence = renderContour();
   } else {
     evidence = renderField();
   }
 
-  float vignette = smoothstep(1.15, 0.24, length(stagePoint() * vec2(0.72, 0.92)));
+  float fixedReference = fixedReferenceGeometry(point);
+  float vignette = smoothstep(1.15, 0.24, length(point * vec2(0.72, 0.92)));
   float presentation = mix(0.72, 1.34, uSettings.x) * mix(0.88, 1.18, uSettings.z);
   vec3 color = evidence * presentation * (0.76 + vignette * 0.24);
   float compression = mix(0.42, 0.62, uHighlightCompression);
@@ -255,6 +269,11 @@ void main() {
     compressedIntensity = min(1.0, pow(max(compressedIntensity, 0.0), 0.92));
     color *= compressedIntensity / pigmentIntensity;
   }
+  color = mix(
+    color,
+    uReference,
+    saturate(fixedReference * ${REFERENCE_GEOMETRY_INTENSITY.toFixed(2)})
+  );
   color += uBackground;
   outColor = vec4(color, 1.0);
 }

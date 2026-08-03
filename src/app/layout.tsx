@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Mono, Unbounded } from "next/font/google";
+import { BRAND_PIGMENTS } from "@/lib/visualizer/types";
 import "./globals.css";
 
 const display = Unbounded({
@@ -11,13 +12,13 @@ const display = Unbounded({
 const mono = DM_Mono({
   variable: "--font-dm-mono",
   subsets: ["latin"],
-  weight: ["300", "400", "500"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
   title: "AV/01 — Audio Visualizer",
   description:
-    "A local-first visual instrument that transforms rhythm, timbre and texture into living GPU scenes.",
+    "A local-first signal instrument with five scientifically grounded audio views and controlled reference signals.",
   applicationName: "AV/01 Audio Visualizer",
   keywords: [
     "audio visualizer",
@@ -30,15 +31,15 @@ export const metadata: Metadata = {
   authors: [{ name: "Audio Visualizer" }],
   category: "music",
   openGraph: {
-    title: "AV/01 — Sound, seen.",
-    description: "A real-time visual instrument for music, system audio and live input.",
+    title: "AV/01 — Five views. One signal.",
+    description: "A real-time visual instrument with controlled, locally generated audio references.",
     type: "website",
   },
 };
 
 export const viewport: Viewport = {
-  colorScheme: "dark",
-  themeColor: "#000000",
+  colorScheme: "light dark",
+  themeColor: BRAND_PIGMENTS.reference,
   width: "device-width",
   initialScale: 1,
 };
@@ -49,8 +50,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${display.variable} ${mono.variable}`}>{children}</body>
+    <html lang="en" className={`${display.variable} ${mono.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }

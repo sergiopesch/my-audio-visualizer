@@ -6,11 +6,11 @@ import {
   useId,
   useRef,
   useState,
-  type CSSProperties,
   type ChangeEvent,
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
+import { BRAND_PIGMENTS } from "@/lib/visualizer/types";
 
 export interface WaveformTimelineProps {
   peaks: number[];
@@ -18,15 +18,8 @@ export interface WaveformTimelineProps {
   duration: number;
   onSeek: (time: number) => void;
   disabled?: boolean;
-  accent?: string;
 }
 
-type TimelineStyle = CSSProperties & {
-  "--waveform-accent": string;
-  "--waveform-progress": string;
-};
-
-const DEFAULT_ACCENT = "#008CFF";
 const MAX_DEVICE_PIXEL_RATIO = 2;
 const TARGET_BAR_STRIDE = 4;
 const BAR_WIDTH_RATIO = 0.56;
@@ -104,7 +97,6 @@ export function WaveformTimeline({
   duration,
   onSeek,
   disabled = false,
-  accent = DEFAULT_ACCENT,
 }: WaveformTimelineProps) {
   const rangeId = useId();
   const descriptionId = useId();
@@ -152,11 +144,10 @@ export function WaveformTimeline({
     context.clearRect(0, 0, width, height);
 
     const styles = getComputedStyle(surface);
-    const resolvedAccent = resolveCanvasColor(context, accent, DEFAULT_ACCENT);
     const playedColor = resolveCanvasColor(
       context,
       styles.getPropertyValue("--waveform-played-color").trim(),
-      resolvedAccent,
+      BRAND_PIGMENTS.signal,
     );
     const unplayedColor = resolveCanvasColor(
       context,
@@ -166,7 +157,7 @@ export function WaveformTimeline({
     const playheadColor = resolveCanvasColor(
       context,
       styles.getPropertyValue("--waveform-playhead-color").trim(),
-      resolvedAccent,
+      playedColor,
     );
 
     const centerY = height / 2;
@@ -246,7 +237,7 @@ export function WaveformTimeline({
         interactionDisabled,
       );
     }
-  }, [accent, interactionDisabled, peaks, progress, safeDuration]);
+  }, [interactionDisabled, peaks, progress, safeDuration]);
 
   useEffect(() => {
     drawRef.current = draw;
@@ -384,20 +375,14 @@ export function WaveformTimeline({
     [interactionDisabled, onSeek, safeCurrentTime, safeDuration],
   );
 
-  const timelineStyle: TimelineStyle = {
-    "--waveform-accent": accent,
-    "--waveform-progress": `${progress * 100}%`,
-  };
-
   return (
     <div
       className="waveform-timeline"
       data-disabled={interactionDisabled ? "true" : undefined}
       data-dragging={isDragging ? "true" : undefined}
-      style={timelineStyle}
     >
       <div className="waveform-timeline__header">
-        <label className="waveform-timeline__label" htmlFor={rangeId}>
+        <label htmlFor={rangeId}>
           Playback position
         </label>
         <output
@@ -405,11 +390,11 @@ export function WaveformTimeline({
           htmlFor={rangeId}
           id={descriptionId}
         >
-          <span className="waveform-timeline__current-time">{currentLabel}</span>
-          <span className="waveform-timeline__time-separator" aria-hidden="true">
+          <span>{currentLabel}</span>
+          <span aria-hidden="true">
             {" / "}
           </span>
-          <span className="waveform-timeline__duration">{durationLabel}</span>
+          <span>{durationLabel}</span>
         </output>
       </div>
 
@@ -446,5 +431,3 @@ export function WaveformTimeline({
     </div>
   );
 }
-
-export default WaveformTimeline;

@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent } from "react";
 import { SCENES, type SceneId } from "@/lib/visualizer/types";
 
 interface SceneRailProps {
@@ -7,6 +7,18 @@ interface SceneRailProps {
 }
 
 export function SceneRail({ value, onChange }: SceneRailProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const sceneButtonListRef = useRef<Array<HTMLButtonElement | null>>([]);
+
+  useEffect(() => {
+    const list = listRef.current;
+    const selectedIndex = SCENES.findIndex((scene) => scene.id === value);
+    const selected = sceneButtonListRef.current[selectedIndex];
+    if (!list || !selected || list.scrollWidth <= list.clientWidth) return;
+    const left = selected.offsetLeft - (list.clientWidth - selected.offsetWidth) / 2;
+    list.scrollTo({ left: Math.max(0, left), behavior: "auto" });
+  }, [value]);
+
   const handleSceneKeyDown = (
     event: KeyboardEvent<HTMLButtonElement>,
     index: number,
@@ -44,15 +56,23 @@ export function SceneRail({ value, onChange }: SceneRailProps) {
   return (
     <aside className="scene-rail" aria-label="Visual scenes">
       <div className="rail-title">
-        <span>SCENES</span>
-        <span>05</span>
+        <span>CHOOSE VIEW</span>
+        <span>1–5</span>
       </div>
-      <div className="scene-list" role="radiogroup" aria-label="Choose a visual scene">
+      <div
+        className="scene-list"
+        role="radiogroup"
+        aria-label="Choose a visual scene"
+        ref={listRef}
+      >
         {SCENES.map((scene, index) => {
           const selected = scene.id === value;
           return (
             <button
               key={scene.id}
+              ref={(button) => {
+                sceneButtonListRef.current[index] = button;
+              }}
               type="button"
               className={`scene-button${selected ? " is-active" : ""}`}
               role="radio"
@@ -62,18 +82,12 @@ export function SceneRail({ value, onChange }: SceneRailProps) {
               onClick={() => onChange(scene.id)}
               onKeyDown={(event) => handleSceneKeyDown(event, index)}
             >
-              <span className={`scene-glyph scene-glyph-${scene.id}`} aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>
               <span className="scene-number">{String(index + 1).padStart(2, "0")}</span>
               <span className="scene-name">{scene.shortName}</span>
             </button>
           );
         })}
       </div>
-      <p className="rail-hint">1–5 TO SWITCH</p>
     </aside>
   );
 }

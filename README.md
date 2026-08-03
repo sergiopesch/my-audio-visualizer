@@ -1,6 +1,6 @@
 # AV/01 — Audio Visualizer
 
-> Sound, seen.
+> Five views. One signal.
 
 I started this project with one simple idea: choose a track, let the sound move a field of pixels, and record the result.
 
@@ -42,6 +42,7 @@ AV/01 is a browser-native visual instrument for music, voice, instruments and li
 - Open local audio by picker or drag and drop.
 - Capture audio from a shared tab or application.
 - Use a microphone for a room, voice or instrument.
+- Open five built-in PCM reference signals that isolate the behavior of each view.
 - Read the signal through 24 ERB-rate-spaced triangular bands, twelve octave-folded pitch classes, time-domain dynamics, onset-envelope periodicity and rolling spectral self-similarity.
 - Shape five real-time scenes with sensitivity, intensity, glow, detail, frame and visual-comfort controls inside one fixed optical system.
 - Save still frames or record a complete visual performance with audio.
@@ -55,11 +56,25 @@ Your audio stays with you. There is no upload service, account or tracking layer
 | --- | --- | --- | --- |
 | `1` | **Auditory Field** · `AV01-SCI-001` | Blackman-windowed short-time spectrum grouped into 24 ERB-spaced bands | Source or instrument recognition, masking or an individualized hearing model |
 | `2` | **Tonal Orbit** · `AV01-SCI-002` | Twelve-bin, octave-folded equal-tempered pitch-class energy | Note, octave, chord, key or tuning identification |
-| `3` | **Temporal Scope** · `AV01-SCI-003` | Recent mono waveform, RMS, sample peak, crest factor and zero-crossing rate | SPL, LUFS, true peak, stereo phase or calibrated measurement |
+| `3` | **Temporal Scope** · `AV01-SCI-003` | Peak-preserving min/max reduction of the recent mono waveform, plus RMS, sample peak, crest factor and zero-crossing rate | SPL, LUFS, true peak, stereo phase or calibrated measurement |
 | `4` | **Rhythm Lattice** · `AV01-SCI-004` | Spectral-change onset strength and short-term autocorrelation periodicity | A confirmed beat, tempo, downbeat, meter or groove |
 | `5` | **Recurrence Atlas** · `AV01-SCI-005` | Rolling cosine self-similarity of normalized log-ERB spectral shape | Song sections, motifs, sources or structural boundaries |
 
 Every scene can use three output frames. Sensitivity, intensity, glow and detail alter presentation without changing the analysis underneath. The formulas, timing windows, pixel mappings, sources and limitations behind every claim ID live in the [scientific contract](docs/SCIENCE.md).
+
+## Controlled reference signals
+
+The landing page includes five short mono PCM16 WAVs generated on demand at 48 kHz. They are not stock music and they do not travel over the network. Each one opens through the same file-decoding, analyser, feature-bus and renderer path as a user track, automatically selects the relevant view and states what to listen for, what to watch and which property is controlled.
+
+| View | Built-in signal | Expected demonstration |
+| --- | --- | --- |
+| Spectrum | Equal-amplitude 375 Hz / 6 kHz alternation | ERB-band position, centroid and rolloff move while segment RMS remains approximately equal |
+| Pitch class | A3 / A4 octave pair | The octave and waveform period change while the strongest folded pitch class remains A |
+| Waveform | Sine / triangle / softly clipped sine | Frequency and peak remain fixed while time-domain shape and crest factor change |
+| Periodicity | Fifteen transients at 0.5 s spacing | After sufficient history, the onset-envelope candidate approaches 120 BPM-equivalent |
+| Similarity | A–B–A–C spectral-shape sequence | The quieter second A still creates off-diagonal recurrence because shape vectors are level-normalized |
+
+The WAV headers, deterministic SHA-256 hashes and the expected invariants above are executable tests. This is a public demonstration layer for established signal-analysis methods and AV/01's internally tested implementation—not peer review, perceptual proof or calibrated measurement.
 
 ## The differentiator: representation, not skin
 
@@ -87,13 +102,15 @@ The current brand is intentionally narrow:
 
 All darker, quieter or softer tones are opacity blends of those three source pigments. Electric blue never stands in for a scientific variable by itself, and colour is never the only cue for selection, recording, error or focus. This follows current guidance on colour integrity and accessible non-text contrast while keeping AV/01 unmistakably its own instrument.
 
+On white surfaces, small text remains black because electric blue is a large-type and non-text accent there; on black surfaces, blue has sufficient normal-text contrast. White reference axes are rendered at a fixed 38% intensity after presentation tone mapping, so sensitivity, intensity and glow cannot erase the geometry needed to read a scene.
+
 ## It listens to more than volume
 
 The original visualizer reduced each frame of audio to one peak value. AV/01 keeps the immediacy but gives the sound a larger, more exact vocabulary:
 
 - 24 triangular bands laid out on the ERB-rate scale.
 - Twelve octave-folded pitch-class energy bins under a fixed A4 = 440 Hz, twelve-tone equal-tempered mapping.
-- A recent mono waveform with RMS, sample peak, crest factor and zero-crossing rate.
+- A peak-preserving reduction of the recent mono waveform with RMS, sample peak, crest factor and zero-crossing rate.
 - Positive log-spectral change for onset strength, followed by a short-window periodicity candidate.
 - An eight-second rolling self-similarity matrix of normalized log-ERB spectral shape.
 - Spectral centroid, 85% rolloff and a high-frequency power ratio as acoustic descriptors—not direct measures of perceived brightness.
@@ -105,7 +122,7 @@ The level display is normalized digital dBFS, not LUFS or acoustic SPL. Concentr
 
 ### Requirements
 
-- Node.js `22.12.0` or newer
+- Node.js `24` or newer (`.nvmrc` selects the CI baseline)
 - npm `11`
 - A current desktop browser; source capture and recording support are capability-dependent
 
@@ -131,11 +148,11 @@ npm run start
 
 ## Using AV/01
 
-1. Choose **Open a track**, **Capture audio** or **Use microphone**.
+1. Choose a controlled reference signal, **Open audio**, **System** or **Mic**.
 2. When capturing system audio, select a tab or application and enable the browser's **Share audio** option.
-3. Choose a scene and shape its visual settings in the inspector.
+3. Choose a view and open the optional appearance, frame or provenance panels when needed.
 4. Scrub a file with the waveform timeline or perform against a live source.
-5. Save a PNG frame, enter fullscreen or open **Export** to record the performance.
+5. Save a PNG frame, enter fullscreen or open **Render** to record the performance.
 
 Before a source is active, AV/01 can show a deterministic **synthetic preview** generated at a nominal 48 kHz with seed 7 and a 118 BPM pulse pattern. It is a designed feature demonstration, not captured audio, and it is never used to fill in missing live signal.
 
@@ -147,11 +164,11 @@ Before a source is active, AV/01 can show a deterministic **synthetic preview** 
 | `1`–`5` | Switch visual scene |
 | `F` | Enter or leave stage fullscreen |
 | `S` | Download the current frame as PNG |
-| `E` | Open the export panel |
+| `E` | Open the render panel |
 
-Shortcuts are ignored while a form control is focused or the export dialog is open.
+Shortcuts are ignored while a form control is focused or the render dialog is open.
 
-## Exporting a performance
+## Rendering a performance
 
 AV/01 records in real time at 30 FPS. The canvas and the recordable audio destination are joined inside the browser, so the recording uses the same signal, scene, fixed optical system, settings and playback clock as the live stage.
 
@@ -233,14 +250,27 @@ Browser support is based on capabilities rather than a version number:
 
 ## Development checks
 
+Run the complete local release gate—including lint, types, deterministic tests and fixtures, dependency audit, production build and Chromium journeys—with one command:
+
+```bash
+npm run release:check
+```
+
+After a fresh dependency install, install the test browser once with `npm run browsers:install` before running that gate.
+
+The same checks remain available individually for focused development:
+
 ```bash
 npm run type-check
 npm run lint -- --max-warnings=0
 npm test
 npm run science:fixtures:check
 npm run audit:ci
+npm run build
 npm run test:e2e
 ```
+
+GitHub Actions runs the granular checks on pull requests and pushes to `main`. Failed browser runs retain their Playwright screenshot, video and trace evidence for seven days.
 
 To rebuild the measured README image, run the app at `http://127.0.0.1:3000` and then run `npm run docs:screenshot`. Set `AV01_CAPTURE_URL` when the app is running somewhere else. The capture script opens the deterministic A–B–A–C fixture, waits for a populated Recurrence Atlas and rejects browser console errors.
 

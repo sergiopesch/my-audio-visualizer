@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -33,14 +34,22 @@ jobs:
       - name: Lint
         run: npm run lint -- --max-warnings=0
       - name: Type-check
-        run: npm run type-check --if-present
+        run: npm run type-check
       - name: Test
-        run: npm test --if-present
+        run: npm test
       - name: Verify scientific fixtures
         run: npm run science:fixtures:check
       - name: Build
         run: npm run build
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npm run browsers:install -- --with-deps
       - name: Browser end-to-end tests
         run: npm run test:e2e:ci
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
