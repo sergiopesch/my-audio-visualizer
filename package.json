@@ -25,7 +25,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "next": "^15.5.25",
+    "next": "^15.5.26",
     "react": "19",
     "react-dom": "19"
   },
