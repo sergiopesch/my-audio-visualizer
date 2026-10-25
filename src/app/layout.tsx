@@ -1,18 +1,25 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Mono, Unbounded } from "next/font/google";
+import localFont from "next/font/local";
 import { BRAND_PIGMENTS } from "@/lib/visualizer/types";
 import "./globals.css";
 
-const display = Unbounded({
+const display = localFont({
+  src: "./fonts/Unbounded-Variable.ttf",
   variable: "--font-unbounded",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  declarations: [{ prop: "font-family", value: "Unbounded" }],
+  weight: "400 600",
+  style: "normal",
+  display: "swap",
 });
 
-const mono = DM_Mono({
+const mono = localFont({
+  src: [
+    { path: "./fonts/DMMono-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/DMMono-Medium.ttf", weight: "500", style: "normal" },
+  ],
   variable: "--font-dm-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
+  declarations: [{ prop: "font-family", value: "DM Mono" }],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
